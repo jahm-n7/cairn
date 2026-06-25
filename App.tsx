@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFonts, Fredoka_400Regular, Fredoka_600SemiBold, Fredoka_700Bold } from '@expo-google-fonts/fredoka';
@@ -14,6 +14,8 @@ import DepositScreen from './src/screens/DepositScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import CapsuleDetailFlow from './src/screens/CapsuleDetailFlow';
 import SettingsScreen from './src/screens/SettingsScreen';
+import FriendsFlow from './src/screens/FriendsFlow';
+import LoadingScreen from './src/screens/LoadingScreen';
 
 type FullCapsule = Capsule & { here: boolean; distance: string };
 
@@ -22,17 +24,21 @@ function Shell() {
   const [tab, setTab] = useState<Tab>('discover');
   const [detail, setDetail] = useState<FullCapsule | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [friendsOpen, setFriendsOpen] = useState(false);
 
   return (
     <LinearGradient colors={[colors.bgRadialTop, colors.bgRadialMid, colors.bg]} style={styles.container}>
       <View style={styles.content}>
         {tab === 'discover' && <DiscoverScreen onOpenDetail={setDetail} />}
         {tab === 'create' && <DepositScreen onDone={() => setTab('discover')} />}
-        {tab === 'profile' && <ProfileScreen onOpenSettings={() => setSettingsOpen(true)} />}
+        {tab === 'profile' && (
+          <ProfileScreen onOpenSettings={() => setSettingsOpen(true)} onOpenFriends={() => setFriendsOpen(true)} />
+        )}
       </View>
       <TabBar active={tab} onChange={setTab} bottomInset={insets.bottom} />
       {detail && <CapsuleDetailFlow capsule={detail} onClose={() => setDetail(null)} />}
       {settingsOpen && <SettingsScreen onClose={() => setSettingsOpen(false)} />}
+      {friendsOpen && <FriendsFlow onClose={() => setFriendsOpen(false)} />}
       <StatusBar style="light" />
     </LinearGradient>
   );
@@ -48,13 +54,15 @@ export default function App() {
     Nunito_700Bold,
     Nunito_800ExtraBold,
   });
+  // Keep the branded loading screen up long enough to see the cairn stack.
+  const [minElapsed, setMinElapsed] = useState(false);
+  useEffect(() => {
+    const id = setTimeout(() => setMinElapsed(true), 2600);
+    return () => clearTimeout(id);
+  }, []);
 
-  if (!fontsLoaded) {
-    return (
-      <View style={styles.loading}>
-        <ActivityIndicator color={colors.accent} />
-      </View>
-    );
+  if (!fontsLoaded || !minElapsed) {
+    return <LoadingScreen />;
   }
 
   return (
@@ -69,5 +77,4 @@ export default function App() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   content: { flex: 1 },
-  loading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },
 });

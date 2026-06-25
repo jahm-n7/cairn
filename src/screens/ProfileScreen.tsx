@@ -7,7 +7,7 @@ import { colors, fonts, goldPinkGradient } from '../theme/colors';
 import { profile, myCapsules } from '../data/profile';
 import { useI18n } from '../i18n';
 
-export default function ProfileScreen({ onOpenSettings }: { onOpenSettings: () => void }) {
+export default function ProfileScreen({ onOpenSettings, onOpenFriends }: { onOpenSettings: () => void; onOpenFriends: () => void }) {
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
 
@@ -46,14 +46,14 @@ export default function ProfileScreen({ onOpenSettings }: { onOpenSettings: () =
           <Text style={styles.statNum}>{profile.capsulesFound}</Text>
           <Text style={styles.statLabel}>{t('prof_found')}</Text>
         </View>
-        <Pressable style={styles.statCard}>
+        <Pressable style={styles.statCard} onPress={onOpenFriends}>
           <Text style={styles.statNum}>5</Text>
           <Text style={styles.statLabel}>{t('prof_friends_count')}</Text>
         </Pressable>
       </View>
 
       {/* friends & access */}
-      <Pressable style={styles.friendsLink}>
+      <Pressable style={styles.friendsLink} onPress={onOpenFriends}>
         <View style={styles.friendsIcon}>
           <Svg width={19} height={19} viewBox="0 0 24 24" fill="none" stroke={colors.accent} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
             <Circle cx={9} cy={8} r={3.2} />

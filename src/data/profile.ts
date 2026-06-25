@@ -7,7 +7,22 @@ export type Friend = {
   shared: number;
   received: number;
   circles: string[];
+  blocked?: boolean;
 };
+
+export type Pending = {
+  id: string;
+  name: string;
+  initials: string;
+  color: string;
+  mutualCount?: number;
+  mutualText?: string;
+};
+
+export const pending: Pending[] = [
+  { id: 'p1', name: 'Inès', initials: 'I', color: '#3a3060', mutualCount: 2 },
+  { id: 'p2', name: 'Théo', initials: 'T', color: '#2d7d6e', mutualText: 'Léo et Camille en commun' },
+];
 
 export type Circle = {
   id: string;
