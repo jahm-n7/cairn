@@ -15,7 +15,10 @@ import ProfileScreen from './src/screens/ProfileScreen';
 import CapsuleDetailFlow from './src/screens/CapsuleDetailFlow';
 import SettingsScreen from './src/screens/SettingsScreen';
 import FriendsFlow from './src/screens/FriendsFlow';
+import MyCapDetailScreen from './src/screens/MyCapDetailScreen';
+import PayScreen, { PayRequest } from './src/screens/PayScreen';
 import LoadingScreen from './src/screens/LoadingScreen';
+import { MyCapsule } from './src/data/profile';
 
 type FullCapsule = Capsule & { here: boolean; distance: string };
 
@@ -25,6 +28,8 @@ function Shell() {
   const [detail, setDetail] = useState<FullCapsule | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [friendsOpen, setFriendsOpen] = useState(false);
+  const [myCap, setMyCap] = useState<MyCapsule | null>(null);
+  const [pay, setPay] = useState<PayRequest | null>(null);
 
   return (
     <LinearGradient colors={[colors.bgRadialTop, colors.bgRadialMid, colors.bg]} style={styles.container}>
@@ -32,13 +37,19 @@ function Shell() {
         {tab === 'discover' && <DiscoverScreen onOpenDetail={setDetail} />}
         {tab === 'create' && <DepositScreen onDone={() => setTab('discover')} />}
         {tab === 'profile' && (
-          <ProfileScreen onOpenSettings={() => setSettingsOpen(true)} onOpenFriends={() => setFriendsOpen(true)} />
+          <ProfileScreen
+            onOpenSettings={() => setSettingsOpen(true)}
+            onOpenFriends={() => setFriendsOpen(true)}
+            onOpenCapsule={setMyCap}
+          />
         )}
       </View>
       <TabBar active={tab} onChange={setTab} bottomInset={insets.bottom} />
-      {detail && <CapsuleDetailFlow capsule={detail} onClose={() => setDetail(null)} />}
+      {detail && <CapsuleDetailFlow capsule={detail} onClose={() => setDetail(null)} onPay={setPay} />}
       {settingsOpen && <SettingsScreen onClose={() => setSettingsOpen(false)} />}
-      {friendsOpen && <FriendsFlow onClose={() => setFriendsOpen(false)} />}
+      {friendsOpen && <FriendsFlow onClose={() => setFriendsOpen(false)} onPay={setPay} />}
+      {myCap && <MyCapDetailScreen capsule={myCap} onClose={() => setMyCap(null)} onPay={setPay} />}
+      {pay && <PayScreen request={pay} onClose={() => setPay(null)} />}
       <StatusBar style="light" />
     </LinearGradient>
   );

@@ -4,10 +4,18 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle, Path, Polyline } from 'react-native-svg';
 import { colors, fonts, goldPinkGradient } from '../theme/colors';
-import { profile, myCapsules } from '../data/profile';
+import { profile, myCapsules, MyCapsule } from '../data/profile';
 import { useI18n } from '../i18n';
 
-export default function ProfileScreen({ onOpenSettings, onOpenFriends }: { onOpenSettings: () => void; onOpenFriends: () => void }) {
+export default function ProfileScreen({
+  onOpenSettings,
+  onOpenFriends,
+  onOpenCapsule,
+}: {
+  onOpenSettings: () => void;
+  onOpenFriends: () => void;
+  onOpenCapsule: (c: MyCapsule) => void;
+}) {
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
 
@@ -74,7 +82,7 @@ export default function ProfileScreen({ onOpenSettings, onOpenFriends }: { onOpe
       <View style={{ marginTop: 10, gap: 10 }}>
         {myCapsules.map((c) => (
           <View key={c.id} style={styles.capCard}>
-            <Pressable style={styles.capTop}>
+            <Pressable style={styles.capTop} onPress={() => onOpenCapsule(c)}>
               <LinearGradient colors={c.gradient} style={styles.capThumb} />
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text style={styles.capPlace} numberOfLines={1}>

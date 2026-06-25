@@ -6,6 +6,7 @@ import Svg, { Circle, Path, Polygon, Polyline } from 'react-native-svg';
 import { colors, fonts, goldPinkGradient } from '../theme/colors';
 import { Capsule, accessKey, mediaKey } from '../data/capsules';
 import { useI18n, Lang } from '../i18n';
+import { PayRequest } from './PayScreen';
 
 type FullCapsule = Capsule & { here: boolean; distance: string };
 type Stage = 'detail' | 'unlock' | 'revealed';
@@ -29,12 +30,16 @@ const RING_C = 2 * Math.PI * RING_R;
 export default function CapsuleDetailFlow({
   capsule,
   onClose,
+  onPay,
 }: {
   capsule: FullCapsule;
   onClose: () => void;
+  onPay: (r: PayRequest) => void;
 }) {
   const insets = useSafeAreaInsets();
   const { t, lang } = useI18n();
+  const payCtx = { gradient: capsule.gradient, place: capsule.place || `${t('capsule_of')} ${capsule.author}`, sub: capsule.dateKey ? t(capsule.dateKey as any) : '' };
+  const pay = (mode: PayRequest['mode']) => onPay({ mode, ...payCtx });
   const [stage, setStage] = useState<Stage>('detail');
   const [solvedRiddle, setSolvedRiddle] = useState(false);
   const [riddleInput, setRiddleInput] = useState('');
@@ -223,15 +228,15 @@ export default function CapsuleDetailFlow({
                 {t('ouvrable_le')} <Text style={styles.goldText}>{untilLabel}</Text> · {capsule.distance}.{'\n'}
                 {t('detail_both_sub')}
               </Text>
-              <PrimaryBtn label={t('btn_open_both')} icon="clock" onPress={startUnlock} />
+              <PrimaryBtn label={t('btn_open_both')} icon="clock" onPress={() => pay('both')} />
               <View style={styles.sepRow}>
                 <View style={styles.sepLine} />
                 <Text style={styles.sepText}>{t('detail_sep')}</Text>
                 <View style={styles.sepLine} />
               </View>
               <View style={styles.dualRow}>
-                <SecondaryBtn label={t('btn_open_now')} icon="clock" onPress={startUnlock} />
-                <SecondaryBtn label={t('btn_open_here')} icon="pin" onPress={startUnlock} />
+                <SecondaryBtn label={t('btn_open_now')} icon="clock" onPress={() => pay('time')} />
+                <SecondaryBtn label={t('btn_open_here')} icon="pin" onPress={() => pay('here')} />
               </View>
             </View>
           )}
@@ -244,7 +249,7 @@ export default function CapsuleDetailFlow({
                 {t('detail_locked_sub')}{'\n'}
                 {t('ouvrable_le')} <Text style={styles.goldText}>{untilLabel}</Text>.
               </Text>
-              <PrimaryBtn label={t('btn_open_now')} icon="clock" onPress={startUnlock} />
+              <PrimaryBtn label={t('btn_open_now')} icon="clock" onPress={() => pay('time')} />
             </View>
           )}
 
@@ -258,7 +263,7 @@ export default function CapsuleDetailFlow({
               </View>
               <Text style={styles.stateTitle}>{t('detail_far_title')}</Text>
               <Text style={styles.stateSub}>{t('far_detail')}{'\n'}{farLine}.</Text>
-              {!!capsule.mine && <PrimaryBtn label={t('btn_open_here')} icon="pin" onPress={startUnlock} />}
+              {!!capsule.mine && <PrimaryBtn label={t('btn_open_here')} icon="pin" onPress={() => pay('here')} />}
             </View>
           )}
 
