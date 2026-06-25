@@ -1,0 +1,47 @@
+export const colors = {
+  bg: '#140d28',
+  bgRadialTop: '#2c2150',
+  bgRadialMid: '#1b1338',
+  panel: 'rgba(44,32,72,0.7)',
+  panelSoft: 'rgba(44,32,72,0.6)',
+  panelFaint: 'rgba(44,32,72,0.5)',
+  panelBorder: 'rgba(255,92,138,0.12)',
+  panelBorderMid: 'rgba(255,92,138,0.16)',
+  panelBorderStrong: 'rgba(255,92,138,0.18)',
+  card: 'rgba(44,32,72,0.82)',
+  accent: '#ff5c8a',
+  accentDeep: '#ff3d77',
+  gold: '#ffd45c',
+  goldDeep: '#ffe08a',
+  accentDim: 'rgba(255,92,138,0.16)',
+  accentDimSoft: 'rgba(255,92,138,0.12)',
+  textPrimary: '#f3ecff',
+  textSecondary: '#8c83a8',
+  textMuted: '#978bb0',
+  textSoft: '#a99fc0',
+  textViolet: '#b59ad0',
+  placeholder: '#6a6390',
+  chevron: '#7d76a0',
+  here: '#cfe4f5',
+  hereLabel: '#9aa8b4',
+  water: '#16213a',
+  river: '#141d33',
+  parkland: 'rgba(52,46,82,0.4)',
+  treeline: 'rgba(90,72,120,0.5)',
+  path: 'rgba(196,182,220,0.12)',
+  positive: '#6e9a6e',
+  onAccent: '#2a0e2a',
+};
+
+// Gold → pink gradient used for all primary CTAs
+export const goldPinkGradient: [string, string] = ['#ffd45c', '#ff3d77'];
+
+export const fonts = {
+  display: 'Fredoka_600SemiBold',
+  displayBold: 'Fredoka_700Bold',
+  displayRegular: 'Fredoka_400Regular',
+  body: 'Nunito_400Regular',
+  bodyMedium: 'Nunito_600SemiBold',
+  bodyBold: 'Nunito_700Bold',
+  bodyExtra: 'Nunito_800ExtraBold',
+};
