@@ -5,6 +5,7 @@ import Svg, { Circle, Polygon, Polyline } from 'react-native-svg';
 import { colors, fonts } from '../theme/colors';
 import { getCapsules, AccessType, Capsule } from '../data/capsules';
 import { useI18n } from '../i18n';
+import { useSettings, formatDistance } from '../settings';
 import ParkMap from '../components/ParkMap';
 import RadarDial from '../components/RadarDial';
 import CapsuleSheet from '../components/CapsuleSheet';
@@ -35,8 +36,9 @@ export default function DiscoverScreen({
 }) {
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
+  const { settings } = useSettings();
   const capsules = useMemo(() => getCapsules(), []);
-  const [view, setView] = useState<ViewMode>('map');
+  const [view, setView] = useState<ViewMode>(settings.defaultView === 'radar' ? 'radar' : 'map');
   const [selectedId, setSelectedId] = useState(capsules[0].id);
   const [tracked, setTracked] = useState<string[]>([capsules[0].id]);
   const [filter, setFilter] = useState<Filter>('all');
@@ -123,7 +125,7 @@ export default function DiscoverScreen({
             </Text>
             {primary && (
               <>
-                <Text style={styles.radarDistance}>{primary.distance}</Text>
+                <Text style={styles.radarDistance}>{formatDistance(primary.dm, settings.units)}</Text>
                 <Text style={styles.radarDir}>
                   {t('capsule_of')} {primary.author} · {primary.dir}
                 </Text>
@@ -154,7 +156,7 @@ export default function DiscoverScreen({
                       <Text style={styles.chipAvatarText}>{c.initials}</Text>
                     </View>
                     <Text style={styles.chipLabel}>
-                      {c.author} · {c.distance}
+                      {c.author} · {formatDistance(c.dm, settings.units)}
                     </Text>
                     <Pressable
                       onPress={(e) => {

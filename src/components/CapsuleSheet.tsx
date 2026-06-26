@@ -5,6 +5,7 @@ import Svg, { Circle } from 'react-native-svg';
 import { colors, fonts } from '../theme/colors';
 import { Capsule, accessKey, mediaKey } from '../data/capsules';
 import { useI18n } from '../i18n';
+import { useSettings, formatDistance } from '../settings';
 
 type Props = {
   capsule: Capsule & { here: boolean; distance: string };
@@ -15,7 +16,8 @@ type Props = {
 
 export default function CapsuleSheet({ capsule, isTracked, onOpen, onToggleTrack }: Props) {
   const { t } = useI18n();
-  const distanceLabel = capsule.here ? t('dist_here') : t('dist_far', { d: capsule.distance });
+  const { settings } = useSettings();
+  const distanceLabel = capsule.here ? t('dist_here') : t('dist_far', { d: formatDistance(capsule.dm, settings.units) });
 
   return (
     <Pressable onPress={onOpen} style={styles.card}>

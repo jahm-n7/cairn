@@ -6,6 +6,7 @@ import Svg, { Circle, Path, Polygon, Polyline } from 'react-native-svg';
 import { colors, fonts, goldPinkGradient } from '../theme/colors';
 import { Capsule, accessKey, mediaKey } from '../data/capsules';
 import { useI18n, Lang } from '../i18n';
+import { useSettings, formatDistance } from '../settings';
 import { PayRequest } from './PayScreen';
 import EmberOrb from '../components/EmberOrb';
 
@@ -39,6 +40,7 @@ export default function CapsuleDetailFlow({
 }) {
   const insets = useSafeAreaInsets();
   const { t, lang } = useI18n();
+  const { settings } = useSettings();
   const payCtx = { gradient: capsule.gradient, place: capsule.place || `${t('capsule_of')} ${capsule.author}`, sub: capsule.dateKey ? t(capsule.dateKey as any) : '' };
   const pay = (mode: PayRequest['mode']) => onPay({ mode, ...payCtx });
   const [stage, setStage] = useState<Stage>('detail');
@@ -59,8 +61,9 @@ export default function CapsuleDetailFlow({
   const canUnearth = !mineBoth && !mineLocked && here && !needsRiddle;
 
   const untilLabel = capsule.openDate ? formatUntil(capsule.openDate, lang) : '';
-  const remaining = `${Math.max(0, capsule.dm - 5)} m`;
-  const farLine = `${t('far_at')}${capsule.distance} · ${t('far_still', { n: remaining })}`;
+  const remaining = formatDistance(Math.max(0, capsule.dm - 5), settings.units);
+  const distanceLabel = formatDistance(capsule.dm, settings.units);
+  const farLine = `${t('far_at')}${distanceLabel} · ${t('far_still', { n: remaining })}`;
   const accessLabel = t(accessKey(capsule.accessType) as any);
   const mediaLabel = t(mediaKey(capsule.media) as any);
   const dateLabel = t(capsule.dateKey as any);
@@ -226,7 +229,7 @@ export default function CapsuleDetailFlow({
               <ClockIcon />
               <Text style={styles.stateTitle}>{t('detail_both_title')}</Text>
               <Text style={styles.stateSub}>
-                {t('ouvrable_le')} <Text style={styles.goldText}>{untilLabel}</Text> · {capsule.distance}.{'\n'}
+                {t('ouvrable_le')} <Text style={styles.goldText}>{untilLabel}</Text> · {distanceLabel}.{'\n'}
                 {t('detail_both_sub')}
               </Text>
               <PrimaryBtn label={t('btn_open_both')} icon="clock" onPress={() => pay('both')} />
@@ -296,7 +299,7 @@ export default function CapsuleDetailFlow({
               <Text style={styles.unearthLead}>{t('here_title')}{'\n'}{t('here_sub')}</Text>
               <View style={styles.rangePill}>
                 <View style={styles.rangeDot} />
-                <Text style={styles.rangeText}>À {capsule.distance} · {t('here_range')}</Text>
+                <Text style={styles.rangeText}>À {distanceLabel} · {t('here_range')}</Text>
               </View>
               <Pressable onPress={startUnlock}>
                 <LinearGradient colors={goldPinkGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.unearthBtn}>

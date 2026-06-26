@@ -5,50 +5,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle, Path, Polyline } from 'react-native-svg';
 import Slider from '@react-native-community/slider';
 import { colors, fonts, goldPinkGradient } from '../theme/colors';
-import { profile } from '../data/profile';
 import { useI18n, Lang, TKey } from '../i18n';
-
-type SettingsState = {
-  reqFrom: string;
-  profilePublic: boolean;
-  liveLocation: boolean;
-  fuzzyLocation: boolean;
-  highAccuracy: boolean;
-  discoverRadius: number;
-  notifNearby: boolean;
-  notifFriend: boolean;
-  notifUnearth: boolean;
-  notifReminder: boolean;
-  sound: boolean;
-  haptics: boolean;
-  defaultView: string;
-  units: string;
-  radarPulse: boolean;
-  textSize: number;
-  reduceMotion: boolean;
-  offline: boolean;
-};
-
-const DEFAULTS: SettingsState = {
-  reqFrom: 'amisamis',
-  profilePublic: true,
-  liveLocation: false,
-  fuzzyLocation: true,
-  highAccuracy: true,
-  discoverRadius: 800,
-  notifNearby: true,
-  notifFriend: true,
-  notifUnearth: true,
-  notifReminder: false,
-  sound: true,
-  haptics: true,
-  defaultView: 'map',
-  units: 'm',
-  radarPulse: true,
-  textSize: 100,
-  reduceMotion: false,
-  offline: false,
-};
+import { useSettings, SettingsState } from '../settings';
 
 type Row =
   | { type: 'toggle'; key: keyof SettingsState; label: string; sub?: string }
@@ -59,14 +17,10 @@ type Row =
 export default function SettingsScreen({ onClose }: { onClose: () => void }) {
   const insets = useSafeAreaInsets();
   const { t, lang, setLang } = useI18n();
-  const [s, setS] = useState<SettingsState>(DEFAULTS);
-  const [acctName, setAcctName] = useState(profile.name);
-  const [acctHandle, setAcctHandle] = useState(profile.handle);
-  const [acctEmail, setAcctEmail] = useState('toi@exemple.fr');
-  const [acctPhone, setAcctPhone] = useState('+33 6 12 34 56 78');
+  const { settings: s, setSetting, account, setAccount } = useSettings();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({ name: false, email: false, phone: false });
 
-  const set = (key: keyof SettingsState, v: any) => setS((prev) => ({ ...prev, [key]: v }));
+  const set = (key: keyof SettingsState, v: any) => setSetting(key, v);
   const toggleExp = (k: string) => setExpanded((e) => ({ ...e, [k]: !e[k] }));
 
   const sections: { title: string; rows: Row[] }[] = [
@@ -169,7 +123,7 @@ export default function SettingsScreen({ onClose }: { onClose: () => void }) {
           <View style={styles.photoRow}>
             <View style={styles.photoAvatar}>
               <LinearGradient colors={['#5a2d70', '#7a3da0']} style={styles.photoAvatarBg}>
-                <Text style={styles.photoAvatarText}>{acctName.charAt(0).toUpperCase()}</Text>
+                <Text style={styles.photoAvatarText}>{account.name.charAt(0).toUpperCase()}</Text>
               </LinearGradient>
               <View style={styles.photoBadge}>
                 <Svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={colors.onAccent} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -187,15 +141,15 @@ export default function SettingsScreen({ onClose }: { onClose: () => void }) {
             </Pressable>
           </View>
 
-          <AccountField label={t('acct_name')} expanded={expanded.name} collapsedValue={`${acctName} · @${acctHandle}`} onToggle={() => toggleExp('name')}>
-            <FieldInput value={acctName} onChange={setAcctName} placeholder={t('ph_your_name')} />
-            <FieldInput value={acctHandle} onChange={setAcctHandle} placeholder={t('ph_handle')} prefix="@" />
+          <AccountField label={t('acct_name')} expanded={expanded.name} collapsedValue={`${account.name} · @${account.handle}`} onToggle={() => toggleExp('name')}>
+            <FieldInput value={account.name} onChange={(v) => setAccount({ name: v })} placeholder={t('ph_your_name')} />
+            <FieldInput value={account.handle} onChange={(v) => setAccount({ handle: v })} placeholder={t('ph_handle')} prefix="@" />
           </AccountField>
-          <AccountField label={t('acct_email')} expanded={expanded.email} collapsedValue={acctEmail} onToggle={() => toggleExp('email')}>
-            <FieldInput value={acctEmail} onChange={setAcctEmail} placeholder={t('acct_email')} />
+          <AccountField label={t('acct_email')} expanded={expanded.email} collapsedValue={account.email} onToggle={() => toggleExp('email')}>
+            <FieldInput value={account.email} onChange={(v) => setAccount({ email: v })} placeholder={t('acct_email')} />
           </AccountField>
-          <AccountField label={t('acct_phone')} expanded={expanded.phone} collapsedValue={acctPhone} onToggle={() => toggleExp('phone')}>
-            <FieldInput value={acctPhone} onChange={setAcctPhone} placeholder={t('acct_phone')} />
+          <AccountField label={t('acct_phone')} expanded={expanded.phone} collapsedValue={account.phone} onToggle={() => toggleExp('phone')}>
+            <FieldInput value={account.phone} onChange={(v) => setAccount({ phone: v })} placeholder={t('acct_phone')} />
           </AccountField>
         </View>
 

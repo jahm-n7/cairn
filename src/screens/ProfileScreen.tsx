@@ -6,6 +6,7 @@ import Svg, { Circle, Path, Polyline } from 'react-native-svg';
 import { colors, fonts, goldPinkGradient } from '../theme/colors';
 import { profile, myCapsules, MyCapsule } from '../data/profile';
 import { useI18n } from '../i18n';
+import { useSettings } from '../settings';
 
 export default function ProfileScreen({
   onOpenSettings,
@@ -18,6 +19,7 @@ export default function ProfileScreen({
 }) {
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
+  const { account } = useSettings();
 
   return (
     <ScrollView
@@ -28,12 +30,12 @@ export default function ProfileScreen({
       {/* header */}
       <View style={styles.headerRow}>
         <LinearGradient colors={['#5a2d70', '#7a3da0']} style={styles.avatar}>
-          <Text style={styles.avatarText}>{profile.name.charAt(0).toUpperCase()}</Text>
+          <Text style={styles.avatarText}>{account.name.charAt(0).toUpperCase()}</Text>
         </LinearGradient>
         <View style={styles.headerInfo}>
-          <Text style={styles.name}>{profile.name}</Text>
+          <Text style={styles.name}>{account.name}</Text>
           <Text style={styles.handle}>
-            @{profile.handle} · {profile.loc}
+            @{account.handle} · {profile.loc}
           </Text>
         </View>
         <Pressable onPress={onOpenSettings} style={styles.gearBtn}>

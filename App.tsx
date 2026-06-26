@@ -7,6 +7,7 @@ import { useFonts, Fredoka_400Regular, Fredoka_600SemiBold, Fredoka_700Bold } fr
 import { Nunito_400Regular, Nunito_600SemiBold, Nunito_700Bold, Nunito_800ExtraBold } from '@expo-google-fonts/nunito';
 import { colors } from './src/theme/colors';
 import { I18nProvider } from './src/i18n';
+import { SettingsProvider } from './src/settings';
 import { Capsule } from './src/data/capsules';
 import TabBar, { Tab } from './src/components/TabBar';
 import DiscoverScreen from './src/screens/DiscoverScreen';
@@ -79,7 +80,9 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <I18nProvider>
-        <Shell />
+        <SettingsProvider>
+          <Shell />
+        </SettingsProvider>
       </I18nProvider>
     </SafeAreaProvider>
   );
