@@ -1,10 +1,10 @@
-import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import MapView, { Circle, Marker } from 'react-native-maps';
+import React, { useRef } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import MapView, { Marker } from 'react-native-maps';
+import Svg, { Circle, Line } from 'react-native-svg';
 import { colors } from '../theme/colors';
 import { Capsule, USER_LOCATION } from '../data/capsules';
 import { useI18n } from '../i18n';
-import { useSettings } from '../settings';
 
 type Props = {
   capsules: (Capsule & { here: boolean; distance: string })[];
@@ -12,35 +12,33 @@ type Props = {
   onSelect: (id: string) => void;
 };
 
-// Real (Apple Maps) map of the area, with one marker per capsule, the
-// "you are here" dot and a circle for the discovery radius. Apple Maps is the
-// default provider on iOS and works in Expo Go (no API key, no native build).
+// Initial framing: centred on the user, tight enough to show the capsules
+// around Parc de la Tête d'Or.
+const REGION = {
+  latitude: USER_LOCATION.latitude,
+  longitude: USER_LOCATION.longitude,
+  latitudeDelta: 0.014,
+  longitudeDelta: 0.011,
+};
+
+// Real (Apple Maps) map of the area, with one marker per capsule and the
+// "you are here" dot. Apple Maps is the default provider on iOS and works in
+// Expo Go (no API key, no native build).
 export default function CapsuleMap({ capsules, selectedId, onSelect }: Props) {
   const { t } = useI18n();
-  const { settings } = useSettings();
+  const mapRef = useRef<MapView>(null);
+  const recenter = () => mapRef.current?.animateToRegion(REGION, 450);
 
   return (
     <View style={styles.container}>
       <MapView
+        ref={mapRef}
         style={StyleSheet.absoluteFill}
         userInterfaceStyle="dark"
         showsPointsOfInterests={false}
         showsCompass={false}
-        initialRegion={{
-          latitude: USER_LOCATION.latitude,
-          longitude: USER_LOCATION.longitude,
-          latitudeDelta: 0.02,
-          longitudeDelta: 0.016,
-        }}
+        initialRegion={REGION}
       >
-        <Circle
-          center={USER_LOCATION}
-          radius={settings.discoverRadius}
-          strokeColor="rgba(255,92,138,0.55)"
-          strokeWidth={1.5}
-          fillColor="rgba(255,92,138,0.08)"
-        />
-
         {capsules.map((c) => {
           const isSel = c.id === selectedId;
           const ring = isSel ? colors.gold : c.here ? colors.accent : 'rgba(255,255,255,0.55)';
@@ -74,6 +72,17 @@ export default function CapsuleMap({ capsules, selectedId, onSelect }: Props) {
           <View style={styles.hereDot} />
         </Marker>
       </MapView>
+
+      <Pressable onPress={recenter} style={styles.recenterBtn} hitSlop={8}>
+        <Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={colors.gold} strokeWidth={2} strokeLinecap="round">
+          <Circle cx={12} cy={12} r={7} />
+          <Line x1={12} y1={1.5} x2={12} y2={4.5} />
+          <Line x1={12} y1={19.5} x2={12} y2={22.5} />
+          <Line x1={1.5} y1={12} x2={4.5} y2={12} />
+          <Line x1={19.5} y1={12} x2={22.5} y2={12} />
+          <Circle cx={12} cy={12} r={2.4} fill={colors.gold} stroke="none" />
+        </Svg>
+      </Pressable>
     </View>
   );
 }
@@ -97,5 +106,18 @@ const styles = StyleSheet.create({
     backgroundColor: colors.here,
     borderWidth: 3,
     borderColor: '#1b1338',
+  },
+  recenterBtn: {
+    position: 'absolute',
+    right: 16,
+    bottom: 210,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: 'rgba(27,19,56,0.85)',
+    borderWidth: 1,
+    borderColor: colors.panelBorderStrong,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
