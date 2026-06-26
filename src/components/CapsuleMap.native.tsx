@@ -65,14 +65,15 @@ export default function CapsuleMap({ capsules, selectedId, onSelect }: Props) {
           );
         })}
 
-        <Marker coordinate={USER_LOCATION} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false}>
+        <Marker
+          coordinate={USER_LOCATION}
+          anchor={{ x: 0.5, y: 0.5 }}
+          tracksViewChanges={false}
+          title={t('str_you_here')}
+        >
           <View style={styles.hereDot} />
         </Marker>
       </MapView>
-
-      <View pointerEvents="none" style={styles.hereLabelWrap}>
-        <Text style={styles.hereLabel}>{t('str_you_here')}</Text>
-      </View>
     </View>
   );
 }
@@ -96,16 +97,5 @@ const styles = StyleSheet.create({
     backgroundColor: colors.here,
     borderWidth: 3,
     borderColor: '#1b1338',
-  },
-  hereLabelWrap: { position: 'absolute', bottom: 14, alignSelf: 'center' },
-  hereLabel: {
-    fontSize: 10.5,
-    color: colors.hereLabel,
-    fontWeight: '600',
-    backgroundColor: 'rgba(27,19,56,0.7)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 10,
-    overflow: 'hidden',
   },
 });

@@ -56,7 +56,14 @@ export default function DiscoverScreen({
   };
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top + 14 }]}>
+    <View style={styles.screen}>
+      {view === 'map' && (
+        <View style={StyleSheet.absoluteFill}>
+          <CapsuleMap capsules={mapCapsules} selectedId={selectedId} onSelect={setSelectedId} />
+        </View>
+      )}
+
+      <View style={[styles.foreground, { paddingTop: insets.top + 14 }]} pointerEvents="box-none">
       <View style={styles.topRow}>
         <View style={styles.tabBar}>
           <Pressable
@@ -113,10 +120,9 @@ export default function DiscoverScreen({
         </View>
       </View>
 
-      <View style={styles.content}>
-        {view === 'map' ? (
-          <CapsuleMap capsules={mapCapsules} selectedId={selectedId} onSelect={setSelectedId} />
-        ) : trackedCapsules.length > 0 ? (
+      {view === 'radar' && (
+        <View style={styles.content}>
+          {trackedCapsules.length > 0 ? (
           <View style={styles.radarContainer}>
             <Text style={styles.eyebrow}>
               {trackedCapsules.length > 1
@@ -186,7 +192,9 @@ export default function DiscoverScreen({
               <Text style={styles.emptyBtnText}>{t('open_map_btn')}</Text>
             </Pressable>
           </View>
-        )}
+          )}
+        </View>
+      )}
       </View>
 
       <CapsuleSheet
@@ -201,6 +209,7 @@ export default function DiscoverScreen({
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
+  foreground: { flex: 1 },
   eyebrow: {
     fontSize: 11,
     letterSpacing: 1.8,
