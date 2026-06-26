@@ -14,6 +14,8 @@ export type Capsule = {
   dateKey: string;
   x: `${number}%`;
   y: `${number}%`;
+  lat: number;
+  lng: number;
   bearing: number;
   rad: number;
   dir: string;
@@ -26,9 +28,14 @@ export type Capsule = {
 
 const OPEN_M = 5;
 
+// Where "Vous êtes ici" sits — the middle of Parc de la Tête d'Or, Lyon.
+export const USER_LOCATION = { latitude: 45.7772, longitude: 4.8558 };
+
 const RAW: Capsule[] = [
   {
     id: 'c1',
+    lat: 45.7765,
+    lng: 4.8536,
     author: 'Margaux',
     initials: 'M',
     gradient: ['#5a2d70', '#7a3da0'],
@@ -47,6 +54,8 @@ const RAW: Capsule[] = [
   },
   {
     id: 'c2',
+    lat: 45.7801,
+    lng: 4.8524,
     author: 'Léo',
     initials: 'L',
     gradient: ['#1f7d6e', '#2d9d8f'],
@@ -65,6 +74,8 @@ const RAW: Capsule[] = [
   },
   {
     id: 'c3',
+    lat: 45.7757,
+    lng: 4.8589,
     author: 'Camille',
     initials: 'C',
     gradient: ['#5a2d70', '#c43d7a'],
@@ -85,6 +96,8 @@ const RAW: Capsule[] = [
   },
   {
     id: 'me1',
+    lat: 45.7749,
+    lng: 4.8512,
     author: 'Vous',
     initials: 'V',
     mine: true,
@@ -106,6 +119,8 @@ const RAW: Capsule[] = [
   },
   {
     id: 'me2',
+    lat: 45.7806,
+    lng: 4.8567,
     author: 'Vous',
     initials: 'V',
     mine: true,
@@ -126,6 +141,8 @@ const RAW: Capsule[] = [
   },
   {
     id: 'me3',
+    lat: 45.7736,
+    lng: 4.8601,
     author: 'Vous',
     initials: 'V',
     mine: true,

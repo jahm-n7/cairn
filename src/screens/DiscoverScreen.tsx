@@ -6,7 +6,7 @@ import { colors, fonts } from '../theme/colors';
 import { getCapsules, AccessType, Capsule } from '../data/capsules';
 import { useI18n } from '../i18n';
 import { useSettings, formatDistance } from '../settings';
-import ParkMap from '../components/ParkMap';
+import CapsuleMap from '../components/CapsuleMap';
 import RadarDial from '../components/RadarDial';
 import CapsuleSheet from '../components/CapsuleSheet';
 
@@ -115,7 +115,7 @@ export default function DiscoverScreen({
 
       <View style={styles.content}>
         {view === 'map' ? (
-          <ParkMap capsules={mapCapsules} selectedId={selectedId} onSelect={setSelectedId} />
+          <CapsuleMap capsules={mapCapsules} selectedId={selectedId} onSelect={setSelectedId} />
         ) : trackedCapsules.length > 0 ? (
           <View style={styles.radarContainer}>
             <Text style={styles.eyebrow}>
