@@ -24,7 +24,7 @@ type FullCapsule = Capsule & { here: boolean; distance: string };
 
 function Shell() {
   const insets = useSafeAreaInsets();
-  const [tab, setTab] = useState<Tab>('discover');
+  const [tab, setTab] = useState<Tab>('create');
   const [detail, setDetail] = useState<FullCapsule | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [friendsOpen, setFriendsOpen] = useState(false);
@@ -35,7 +35,7 @@ function Shell() {
     <LinearGradient colors={[colors.bgRadialTop, colors.bgRadialMid, colors.bg]} style={styles.container}>
       <View style={styles.content}>
         {tab === 'discover' && <DiscoverScreen onOpenDetail={setDetail} />}
-        {tab === 'create' && <DepositScreen onDone={() => setTab('discover')} />}
+        {tab === 'create' && <DepositScreen onDone={() => setTab('discover')} onPay={setPay} />}
         {tab === 'profile' && (
           <ProfileScreen
             onOpenSettings={() => setSettingsOpen(true)}

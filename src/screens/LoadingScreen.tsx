@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
+import Svg, { Defs, Ellipse, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { colors, fonts } from '../theme/colors';
 
 const CREAM = '#fff0f6';
@@ -34,17 +34,13 @@ function Stone({ w, h, bottom, delay }: { w: number; h: number; bottom: number; 
     <Animated.View
       style={[
         styles.stone,
-        {
-          width: w,
-          height: h,
-          borderRadius: h / 2,
-          bottom,
-          marginLeft: -w / 2,
-          opacity,
-          transform: [{ translateY }, { scale }],
-        },
+        { width: w, height: h, bottom, marginLeft: -w / 2, opacity, transform: [{ translateY }, { scale }] },
       ]}
-    />
+    >
+      <Svg width={w} height={h}>
+        <Ellipse cx={w / 2} cy={h / 2} rx={w / 2} ry={h / 2} fill={CREAM} />
+      </Svg>
+    </Animated.View>
   );
 }
 
@@ -126,15 +122,7 @@ const styles = StyleSheet.create({
     marginLeft: -100,
     marginTop: -100,
   },
-  stone: {
-    position: 'absolute',
-    left: '50%',
-    backgroundColor: CREAM,
-    shadowColor: '#ffb4d2',
-    shadowOpacity: 0.4,
-    shadowRadius: 11,
-    shadowOffset: { width: 0, height: 8 },
-  },
+  stone: { position: 'absolute', left: '50%' },
   title: {
     fontFamily: fonts.display,
     fontSize: 36,

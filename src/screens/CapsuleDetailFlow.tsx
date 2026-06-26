@@ -7,6 +7,7 @@ import { colors, fonts, goldPinkGradient } from '../theme/colors';
 import { Capsule, accessKey, mediaKey } from '../data/capsules';
 import { useI18n, Lang } from '../i18n';
 import { PayRequest } from './PayScreen';
+import EmberOrb from '../components/EmberOrb';
 
 type FullCapsule = Capsule & { here: boolean; distance: string };
 type Stage = 'detail' | 'unlock' | 'revealed';
@@ -179,13 +180,13 @@ export default function CapsuleDetailFlow({
                 transform="rotate(-90 72 72)"
               />
             </Svg>
-            <LinearGradient colors={goldPinkGradient} style={styles.holdOrb}>
+            <EmberOrb size={126}>
               <Svg width={30} height={30} viewBox="0 0 24 24" fill="none" stroke={colors.onAccent} strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
                 <Path d="M3 21h18" />
                 <Path d="M6 21V11l6-5 6 5v10" />
               </Svg>
               <Text style={styles.holdOrbText}>{t('unearth_hold')}</Text>
-            </LinearGradient>
+            </EmberOrb>
           </Pressable>
           <Text style={styles.holdLead}>
             {t('hold_lead')}

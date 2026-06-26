@@ -13,6 +13,7 @@ export type PayRequest = {
   gradient?: [string, string];
   place?: string;
   sub?: string;
+  units?: number; // for friend mode: number of extra people being paid for
   onProceed?: () => void;
 };
 
@@ -40,9 +41,26 @@ export default function PayScreen({ request, onClose }: { request: PayRequest; o
   const [confirmKind, setConfirmKind] = useState<'pay' | 'edit' | null>(null);
 
   const { mode } = request;
-  const price = mode === 'both' || mode === 'edit' ? '4,99 €' : mode === 'friend' ? '1,99 €' : '2,99 €';
-  const place = mode === 'friend' ? 'Ami supplémentaire' : mode === 'circle' ? 'Cercle supplémentaire' : request.place || 'Capsule';
-  const sub = mode === 'friend' || mode === 'circle' ? SUBS[mode] : request.sub || SUBS[mode];
+  const units = Math.max(1, request.units ?? 1);
+  const fmtEur = (n: number) => n.toFixed(2).replace('.', ',') + ' €';
+  const price =
+    mode === 'both' || mode === 'edit' ? '4,99 €' : mode === 'friend' ? fmtEur(units * 1.99) : '2,99 €';
+  const place =
+    mode === 'friend'
+      ? units > 1
+        ? `${units} amis supplémentaires`
+        : 'Ami supplémentaire'
+      : mode === 'circle'
+      ? 'Cercle supplémentaire'
+      : request.place || 'Capsule';
+  const sub =
+    mode === 'friend'
+      ? units > 1
+        ? `${units} personnes en plus`
+        : '6ᵉ ami'
+      : mode === 'circle'
+      ? SUBS.circle
+      : request.sub || SUBS[mode];
   const desc =
     mode === 'here' ? t('pay_here') : mode === 'friend' ? t('pay_friend') : mode === 'circle' ? t('pay_circle') : mode === 'both' ? t('pay_both') : mode === 'edit' ? t('pay_edit') : t('pay_time');
   const ctaLabel = mode === 'edit' ? t('pay_cta_edit') : mode === 'circle' || mode === 'friend' ? t('pay_cta_add') : t('pay_cta_open');

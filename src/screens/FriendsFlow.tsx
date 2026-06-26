@@ -307,7 +307,7 @@ export default function FriendsFlow({ onClose, onPay }: { onClose: () => void; o
                       </Svg>
                     </View>
                     <View style={{ flex: 1, minWidth: 0 }}>
-                      <Text style={styles.rowName}>{c.name}</Text>
+                      <Text style={styles.rowName} numberOfLines={1}>{c.name}</Text>
                       <Text style={styles.rowSub} numberOfLines={1}>{desc}</Text>
                     </View>
                     <View style={styles.circleMeta}>
