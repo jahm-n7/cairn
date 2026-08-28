@@ -1,5 +1,7 @@
 import React, { useRef } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '../theme/textScale';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MapView, { Marker } from 'react-native-maps';
 import Svg, { Circle, Line } from 'react-native-svg';
 import { colors } from '../theme/colors';
@@ -26,6 +28,7 @@ const REGION = {
 // Expo Go (no API key, no native build).
 export default function CapsuleMap({ capsules, selectedId, onSelect }: Props) {
   const { t } = useI18n();
+  const insets = useSafeAreaInsets();
   const mapRef = useRef<MapView>(null);
   const recenter = () => mapRef.current?.animateToRegion(REGION, 450);
 
@@ -73,7 +76,7 @@ export default function CapsuleMap({ capsules, selectedId, onSelect }: Props) {
         </Marker>
       </MapView>
 
-      <Pressable onPress={recenter} style={styles.recenterBtn} hitSlop={8}>
+      <Pressable onPress={recenter} style={[styles.recenterBtn, { top: insets.top + 70 }]} hitSlop={8}>
         <Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={colors.gold} strokeWidth={2} strokeLinecap="round">
           <Circle cx={12} cy={12} r={7} />
           <Line x1={12} y1={1.5} x2={12} y2={4.5} />
@@ -109,8 +112,7 @@ const styles = StyleSheet.create({
   },
   recenterBtn: {
     position: 'absolute',
-    right: 16,
-    bottom: 210,
+    right: 26,
     width: 46,
     height: 46,
     borderRadius: 23,

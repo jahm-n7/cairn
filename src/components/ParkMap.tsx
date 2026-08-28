@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '../theme/textScale';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { colors } from '../theme/colors';
 import { Capsule } from '../data/capsules';

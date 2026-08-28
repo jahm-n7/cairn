@@ -6,22 +6,28 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   TextInput,
   View,
 } from 'react-native';
+import { Text } from '../theme/textScale';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle, Defs, Line, Path, Polygon, Polyline, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { colors, fonts, goldPinkGradient } from '../theme/colors';
-import { friends as ALL_FRIENDS, circles as ALL_CIRCLES } from '../data/profile';
+import { friends as ALL_FRIENDS, circles as ALL_CIRCLES, MyCapsule } from '../data/profile';
+import { useCapsules } from '../data/capsulesStore';
+import { useSettings } from '../settings';
+import { successHaptic, tapHaptic } from '../theme/haptics';
 import { useI18n, TKey } from '../i18n';
 import { PayRequest } from './PayScreen';
 import EmberOrb from '../components/EmberOrb';
+import { TAB_BAR_HEIGHT } from '../components/TabBar';
 
 type Media = 'Audio' | 'Photo' | 'Vidéo';
-type CamMode = 'Photo' | 'Vidéo';
 type Access = 'private' | 'friends' | 'public';
+
+// Press longer than this on the shutter → start a video instead of taking a photo.
+const HOLD_MS = 260;
 
 function fmtTime(seconds: number): string {
   const m = Math.floor(seconds / 60);
@@ -30,6 +36,9 @@ function fmtTime(seconds: number): string {
 }
 
 // Example default when the user enables the date condition (tomorrow at 12:30).
+// The mock "you are here" spot a capsule is buried at.
+const CURRENT_PLACE = "Parc de la Tête d'Or";
+
 function defaultDate(): string {
   const d = new Date();
   d.setDate(d.getDate() + 1);
@@ -66,11 +75,48 @@ const emptyDraft = (): Draft => ({
   riddleA: '',
 });
 
+const NEW_GRADIENTS: [string, string][] = [
+  ['#5a2d70', '#7a3da0'],
+  ['#1f7d6e', '#2d9d8f'],
+  ['#5a2d70', '#c43d7a'],
+  ['#3a3060', '#6e2d9d'],
+];
+
+// Turn the finished draft into a capsule for the profile "Mes capsules" list.
+function buildCapsule(d: Draft): MyCapsule {
+  const media: Media = d.media ?? 'Photo';
+  const accessLabel = d.access === 'public' ? 'Public' : d.access === 'friends' ? 'Amis choisis' : 'Privé';
+  const opens =
+    d.access === 'public'
+      ? 'Public · tout le monde'
+      : d.access === 'friends'
+        ? `Amis choisis · ${d.friends.length} personne${d.friends.length > 1 ? 's' : ''}`
+        : 'Privé · vous';
+  return {
+    id: `usr-${Date.now()}`,
+    place: CURRENT_PLACE,
+    sub: `${media} · déposée à l'instant`,
+    media,
+    access: accessLabel,
+    status: 'En attente',
+    statusDot: '#ff5c8a',
+    gradient: NEW_GRADIENTS[Math.floor(Math.random() * NEW_GRADIENTS.length)],
+    message: d.message.trim() ? `« ${d.message.trim()} »` : '« Un souvenir déposé ici. »',
+    condition: d.useRiddle ? 'Présence sur le lieu · énigme' : 'Présence sur le lieu · à moins de 5 m',
+    opens,
+    openAt: d.useDate && d.date ? d.date : defaultDate(),
+    openDate: '',
+  };
+}
+
 const FREE_PEOPLE = 5;
 
-export default function DepositScreen({ onDone, onPay }: { onDone: () => void; onPay: (r: PayRequest) => void }) {
+export default function DepositScreen({ onPay, onCapturingChange }: { onPay: (r: PayRequest) => void; onCapturingChange?: (capturing: boolean) => void }) {
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
+  const { addMyCapsule } = useCapsules();
+  const { settings } = useSettings();
+  const reduceMotion = settings.reduceMotion;
   const [step, setStep] = useState(1);
   const [buried, setBuried] = useState(false);
   const [draft, setDraft] = useState<Draft>(emptyDraft);
@@ -78,7 +124,13 @@ export default function DepositScreen({ onDone, onPay }: { onDone: () => void; o
   const [paidPeople, setPaidPeople] = useState(0);
 
   // capture (step 1) local state
-  const [camMode, setCamMode] = useState<CamMode>('Photo');
+  const [camRec, setCamRec] = useState(false); // holding the shutter → recording a video
+  const [camLocked, setCamLocked] = useState(false); // hands-free video recording
+  const [camSecs, setCamSecs] = useState(0);
+  const camRecRef = useRef(false);
+  const camLockedRef = useRef(false);
+  const camHold = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const camSecTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const [audioMode, setAudioMode] = useState(false);
   const [recording, setRecording] = useState(false);
   const [recLocked, setRecLocked] = useState(false);
@@ -90,8 +142,10 @@ export default function DepositScreen({ onDone, onPay }: { onDone: () => void; o
   const recTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const playTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const flip = useRef(new Animated.Value(0)).current;
+  const recBlink = useRef(new Animated.Value(1)).current; // blinking REC dot while recording
 
   const flipCam = () => {
+    if (reduceMotion) return; // instant, no flip animation
     flip.setValue(0);
     Animated.timing(flip, { toValue: 1, duration: 460, easing: Easing.inOut(Easing.ease), useNativeDriver: false }).start(() => flip.setValue(0));
   };
@@ -101,11 +155,38 @@ export default function DepositScreen({ onDone, onPay }: { onDone: () => void; o
   const clearTimers = () => {
     if (recTimer.current) clearInterval(recTimer.current);
     if (playTimer.current) clearInterval(playTimer.current);
+    if (camSecTimer.current) clearInterval(camSecTimer.current);
+    if (camHold.current) clearTimeout(camHold.current);
     recTimer.current = null;
     playTimer.current = null;
+    camSecTimer.current = null;
+    camHold.current = null;
   };
 
   useEffect(() => () => clearTimers(), []);
+
+  // Tell the shell to hide its chrome (tab bar) while recording a video or a voice note.
+  useEffect(() => {
+    onCapturingChange?.(camRec || recording);
+  }, [camRec, recording, onCapturingChange]);
+
+  // Blink the REC dot while a video is recording (steady when motion is reduced).
+  useEffect(() => {
+    if (!camRec || reduceMotion) {
+      recBlink.stopAnimation();
+      recBlink.setValue(1);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(recBlink, { toValue: 0.15, duration: 550, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
+        Animated.timing(recBlink, { toValue: 1, duration: 550, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [camRec, recBlink, reduceMotion]);
+  useEffect(() => () => onCapturingChange?.(false), [onCapturingChange]);
 
   const resetCapture = () => {
     clearTimers();
@@ -114,25 +195,86 @@ export default function DepositScreen({ onDone, onPay }: { onDone: () => void; o
     setRecSeconds(0);
     setAudioPlaying(false);
     setPlayPos(0);
+    camRecRef.current = false;
+    camLockedRef.current = false;
+    setCamRec(false);
+    setCamLocked(false);
+    setCamSecs(0);
   };
 
   const reset = () => {
     setStep(1);
     setBuried(false);
     setDraft(emptyDraft());
-    setCamMode('Photo');
     resetCapture();
   };
 
+  // After burying, return straight to the camera (reset the flow, stay on this tab).
   const finish = () => {
     reset();
-    onDone();
   };
 
   // --- capture handlers ---
-  const shutter = () => {
-    patch({ media: camMode, captured: true });
+  // Tap the shutter → photo. Press-and-hold → record a video (release to keep it),
+  // or slide up while holding to lock hands-free recording until you tap stop.
+  const startCamRec = () => {
+    tapHaptic();
+    camRecRef.current = true;
+    setCamRec(true);
+    setCamSecs(0);
+    if (camSecTimer.current) clearInterval(camSecTimer.current);
+    camSecTimer.current = setInterval(() => setCamSecs((s) => s + 0.1), 100);
   };
+
+  const lockCamRec = () => {
+    if (!camRecRef.current || camLockedRef.current) return;
+    camLockedRef.current = true;
+    setCamLocked(true);
+  };
+
+  const finalizeCamVideo = () => {
+    if (camSecTimer.current) clearInterval(camSecTimer.current);
+    camSecTimer.current = null;
+    camRecRef.current = false;
+    camLockedRef.current = false;
+    setCamRec(false);
+    setCamLocked(false);
+    setCamSecs(0);
+    patch({ media: 'Vidéo', captured: true });
+  };
+
+  const releaseCam = () => {
+    if (camHold.current) {
+      clearTimeout(camHold.current);
+      camHold.current = null;
+    }
+    if (camRecRef.current) {
+      if (camLockedRef.current) return; // locked → keep recording until "stop"
+      finalizeCamVideo();
+    } else {
+      tapHaptic();
+      patch({ media: 'Photo', captured: true }); // quick tap → photo
+    }
+  };
+
+  const camPan = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponderCapture: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponderCapture: () => true,
+      onPanResponderTerminationRequest: () => false,
+      onShouldBlockNativeResponder: () => true,
+      onPanResponderGrant: () => {
+        camHold.current = setTimeout(startCamRec, HOLD_MS);
+      },
+      onPanResponderMove: (_e, g) => {
+        if (g.dy < -60) lockCamRec();
+      },
+      onPanResponderRelease: () => releaseCam(),
+      onPanResponderTerminate: () => releaseCam(),
+    })
+  ).current;
 
   const startRec = () => {
     if (recTimer.current) return;
@@ -309,10 +451,58 @@ export default function DepositScreen({ onDone, onPay }: { onDone: () => void; o
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 6 }]}>
-      <Ambiance />
+      {cCamera ? (
+        /* full-screen camera viewfinder behind the controls */
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.viewfinderFull,
+            {
+              // Flat in-plane flip (horizontal squish) so it never projects
+              // forward in 3D over the controls and status elements.
+              transform: [
+                { scaleX: flip.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 0.02, 1] }) },
+              ],
+            },
+          ]}
+        >
+          {/* radial gradient backdrop */}
+          <Svg style={StyleSheet.absoluteFill} width="100%" height="100%">
+            <Defs>
+              <RadialGradient id="vf" cx="0.5" cy="0.18" r="0.85">
+                <Stop offset="0" stopColor="#3a2754" />
+                <Stop offset="0.55" stopColor="#1d1238" />
+                <Stop offset="1" stopColor="#140d28" />
+              </RadialGradient>
+            </Defs>
+            <Rect x="0" y="0" width="100%" height="100%" fill="url(#vf)" />
+          </Svg>
+          {/* rule-of-thirds grid */}
+          <View style={[styles.gridLine, { left: '33.3%', top: 0, bottom: 0, width: 1 }]} />
+          <View style={[styles.gridLine, { left: '66.6%', top: 0, bottom: 0, width: 1 }]} />
+          <View style={[styles.gridLine, { top: '33.3%', left: 0, right: 0, height: 1 }]} />
+          <View style={[styles.gridLine, { top: '66.6%', left: 0, right: 0, height: 1 }]} />
+          {/* focus reticle */}
+          <View style={styles.reticle} />
+          {/* recording indicator dot */}
+          {camRec && (
+            <Animated.View style={[styles.recIndicator, { top: insets.top + 22, opacity: recBlink }]}>
+              <View style={styles.recIndicatorDot} />
+              <Text style={styles.recIndicatorText}>REC</Text>
+            </Animated.View>
+          )}
+          {/* flip flash */}
+          <Animated.View
+            pointerEvents="none"
+            style={[styles.flipFlash, { opacity: flip.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 0.5, 0] }) }]}
+          />
+        </Animated.View>
+      ) : (
+        <Ambiance reduce={reduceMotion} />
+      )}
       {/* header — just a back button */}
       <View style={styles.header}>
-        {canBack && (
+        {canBack && !recording && !camRec && (
           <Pressable onPress={onBack} style={styles.backBtn}>
             <Svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={colors.textPrimary} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
               <Polyline points="15 6 9 12 15 18" />
@@ -323,95 +513,56 @@ export default function DepositScreen({ onDone, onPay }: { onDone: () => void; o
 
       <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false} scrollEnabled={step !== 1}>
         {cCamera && (
-          <View style={{ flex: 1, gap: 16 }}>
-            {/* viewfinder */}
-            <Animated.View
-              style={[
-                styles.viewfinder,
-                {
-                  transform: [
-                    { perspective: 800 },
-                    { rotateY: flip.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] }) },
-                  ],
-                },
-              ]}
-            >
-              {/* radial gradient backdrop */}
-              <Svg style={StyleSheet.absoluteFill} width="100%" height="100%">
-                <Defs>
-                  <RadialGradient id="vf" cx="0.5" cy="0.18" r="0.85">
-                    <Stop offset="0" stopColor="#3a2754" />
-                    <Stop offset="0.55" stopColor="#1d1238" />
-                    <Stop offset="1" stopColor="#140d28" />
-                  </RadialGradient>
-                </Defs>
-                <Rect x="0" y="0" width="100%" height="100%" fill="url(#vf)" />
-              </Svg>
-              {/* rule-of-thirds grid */}
-              <View style={[styles.gridLine, { left: '33.3%', top: 0, bottom: 0, width: 1 }]} />
-              <View style={[styles.gridLine, { left: '66.6%', top: 0, bottom: 0, width: 1 }]} />
-              <View style={[styles.gridLine, { top: '33.3%', left: 0, right: 0, height: 1 }]} />
-              <View style={[styles.gridLine, { top: '66.6%', left: 0, right: 0, height: 1 }]} />
-              {/* corner brackets */}
-              <View style={[styles.bracket, { top: 16, left: 16, borderTopWidth: 2, borderLeftWidth: 2, borderTopLeftRadius: 5 }]} />
-              <View style={[styles.bracket, { top: 16, right: 16, borderTopWidth: 2, borderRightWidth: 2, borderTopRightRadius: 5 }]} />
-              <View style={[styles.bracket, { bottom: 16, left: 16, borderBottomWidth: 2, borderLeftWidth: 2, borderBottomLeftRadius: 5 }]} />
-              <View style={[styles.bracket, { bottom: 16, right: 16, borderBottomWidth: 2, borderRightWidth: 2, borderBottomRightRadius: 5 }]} />
-              {/* focus reticle */}
-              <View style={styles.reticle} />
-              {/* status pill */}
-              <View style={styles.camStatusWrap}>
-                <View style={styles.camStatusPill}>
-                  {camMode === 'Vidéo' ? (
-                    <View style={styles.recDot} />
-                  ) : (
-                    <Svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={colors.gold} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                      <Path d="M12 21s-7-5.6-7-11a7 7 0 0 1 14 0c0 5.4-7 11-7 11z" />
-                      <Circle cx={12} cy={10} r={2.4} />
-                    </Svg>
-                  )}
-                  <Text style={styles.camStatusText}>
-                    {camMode === 'Vidéo' ? t('cam_status_video') : t('cam_status_photo')}
-                  </Text>
-                </View>
-              </View>
-              <Text style={styles.camHint}>
-                {camMode === 'Vidéo' ? t('cam_hint_video') : t('cam_hint_photo')}
-              </Text>
-              {/* flip flash */}
-              <Animated.View
-                pointerEvents="none"
-                style={[styles.flipFlash, { opacity: flip.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 0.5, 0] }) }]}
-              />
-            </Animated.View>
-
-            {/* mode toggle */}
-            <View style={styles.camModeToggle}>
-              <Pressable onPress={() => setCamMode('Photo')} style={[styles.camPill, camMode === 'Photo' && styles.camPillActive]}>
-                <Text style={[styles.camPillText, camMode === 'Photo' && styles.camPillTextActive]}>{t('media_photo')}</Text>
-              </Pressable>
-              <Pressable onPress={() => setCamMode('Vidéo')} style={[styles.camPill, camMode === 'Vidéo' && styles.camPillActive]}>
-                <Text style={[styles.camPillText, camMode === 'Vidéo' && styles.camPillTextActive]}>{t('media_video')}</Text>
-              </Pressable>
-            </View>
+          <View style={styles.camControlsWrap}>
+            <Text style={styles.camHint}>
+              {camLocked ? t('cam_tap_stop') : camRec ? t('audio_swipe_lock') : t('cam_hint_photo')}
+            </Text>
 
             {/* controls: mic / shutter / flip */}
             <View style={styles.camControls}>
-              <Pressable onPress={() => setAudioMode(true)} style={styles.camSideBtn}>
-                <View style={styles.camSideCircle}>
-                  <MediaIcon media="Audio" size={23} color="#ff9ec0" />
-                </View>
-                <Text style={styles.camSideLabel}>{t('media_audio')}</Text>
-              </Pressable>
+              {camRec ? (
+                <View style={styles.camSideBtn} />
+              ) : (
+                <Pressable onPress={() => setAudioMode(true)} style={styles.camSideBtn}>
+                  <View style={styles.camSideCircle}>
+                    <MediaIcon media="Audio" size={23} color="#ff9ec0" />
+                  </View>
+                  <Text style={styles.camSideLabel}>{t('media_audio')}</Text>
+                </Pressable>
+              )}
 
-              <Pressable onPress={shutter} style={styles.shutter}>
-                <View style={styles.shutterRing} />
-                {camMode === 'Photo' ? (
-                  <View style={styles.shutterInnerPhoto} />
-                ) : (
-                  <View style={styles.shutterInnerVideo} />
-                )}
-              </Pressable>
+              {camLocked ? (
+                <Pressable onPress={finalizeCamVideo} style={styles.shutter}>
+                  <View style={[styles.shutterRing, styles.shutterRingRec]} />
+                  <View style={styles.stopSquareSmall} />
+                  <View style={styles.lockBadgeCam}>
+                    <Svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={colors.gold} strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
+                      <Rect x={5} y={11} width={14} height={9} rx={2} />
+                      <Path d="M8 11V8a4 4 0 0 1 8 0v3" />
+                    </Svg>
+                  </View>
+                </Pressable>
+              ) : (
+                <View style={styles.shutter} {...camPan.panHandlers}>
+                  {camRec && (
+                    <View style={styles.lockHintCam}>
+                      <Svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#ff9ec0" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
+                        <Polyline points="6 13 12 7 18 13" />
+                      </Svg>
+                      <Svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#ff9ec0" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
+                        <Rect x={5} y={11} width={14} height={9} rx={2} />
+                        <Path d="M8 11V8a4 4 0 0 1 8 0v3" />
+                      </Svg>
+                    </View>
+                  )}
+                  <View style={[styles.shutterRing, camRec && styles.shutterRingRec]} />
+                  {camRec ? (
+                    <View style={styles.shutterInnerVideo} />
+                  ) : (
+                    <View style={styles.shutterInnerPhoto} />
+                  )}
+                </View>
+              )}
 
               <Pressable onPress={flipCam} style={styles.camSideBtn}>
                 <View style={[styles.camSideCircle, { borderColor: 'rgba(255,92,138,0.16)' }]}>
@@ -426,63 +577,84 @@ export default function DepositScreen({ onDone, onPay }: { onDone: () => void; o
         )}
 
         {cAudioRec && (
-          <View style={styles.audioWrap}>
-            <View style={{ alignItems: 'center' }}>
-              <Text style={styles.audioTitle}>{t('audio_title')}</Text>
-              <Text style={styles.audioInstruction}>
-                {recLocked ? t('audio_recording') : recording ? t('audio_swipe_lock') : t('audio_hold')}
-              </Text>
-            </View>
-
-            <View style={styles.recBtnWrap}>
-              {recording && !recLocked && (
-                <View style={styles.lockHint}>
-                  <Svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#ff9ec0" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
-                    <Polyline points="6 13 12 7 18 13" />
-                  </Svg>
-                  <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#ff9ec0" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
-                    <Rect x={5} y={11} width={14} height={9} rx={2} />
-                    <Path d="M8 11V8a4 4 0 0 1 8 0v3" />
-                  </Svg>
+          <View style={{ flex: 1 }}>
+            <View style={styles.audioWrap}>
+              {!recording && (
+                <View style={{ alignItems: 'center' }}>
+                  <Text style={styles.audioTitle}>{t('audio_title')}</Text>
+                  <Text style={styles.audioInstruction}>{t('audio_hold')}</Text>
                 </View>
               )}
-              {recording && (
-                <>
-                  <View style={styles.recPulse} />
-                  <View style={styles.recPulseInner} />
-                </>
-              )}
-              {recLocked ? (
-                <Pressable onPress={finalizeRec} style={styles.recOrbWrapper}>
-                  <EmberOrb size={124}>
-                    <View style={styles.stopSquare} />
-                  </EmberOrb>
-                  <View style={styles.lockBadge}>
-                    <Svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke={colors.gold} strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
+
+              <View style={styles.recBtnWrap}>
+                {recording && !recLocked && (
+                  <View style={styles.lockHint}>
+                    <Svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#ff9ec0" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
+                      <Polyline points="6 13 12 7 18 13" />
+                    </Svg>
+                    <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#ff9ec0" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
                       <Rect x={5} y={11} width={14} height={9} rx={2} />
                       <Path d="M8 11V8a4 4 0 0 1 8 0v3" />
                     </Svg>
                   </View>
+                )}
+                {recording && (
+                  <>
+                    <View style={styles.recPulse} />
+                    <View style={styles.recPulseInner} />
+                  </>
+                )}
+                {recLocked ? (
+                  <Pressable onPress={finalizeRec} style={styles.recOrbWrapper}>
+                    <EmberOrb size={124}>
+                      <View style={styles.stopSquare} />
+                    </EmberOrb>
+                    <View style={styles.lockBadge}>
+                      <Svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke={colors.gold} strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
+                        <Rect x={5} y={11} width={14} height={9} rx={2} />
+                        <Path d="M8 11V8a4 4 0 0 1 8 0v3" />
+                      </Svg>
+                    </View>
+                  </Pressable>
+                ) : (
+                  <View style={styles.recOrbWrapper} {...recPan.panHandlers}>
+                    <EmberOrb size={124} style={recording ? { transform: [{ scale: 1.08 }] } : undefined}>
+                      <MediaIcon media="Audio" size={48} color={colors.onAccent} />
+                    </EmberOrb>
+                  </View>
+                )}
+              </View>
+
+              <Text style={[styles.recTime, { color: recording ? colors.gold : colors.chevron }]}>
+                {fmtTime(recSeconds)}
+              </Text>
+
+              {recLocked && (
+                <Pressable onPress={finalizeRec} style={styles.stopPill}>
+                  <View style={styles.stopPillSquare} />
+                  <Text style={styles.stopPillText}>{t('audio_stop')}</Text>
                 </Pressable>
-              ) : (
-                <View style={styles.recOrbWrapper} {...recPan.panHandlers}>
-                  <EmberOrb size={124} style={recording ? { transform: [{ scale: 1.08 }] } : undefined}>
-                    <MediaIcon media="Audio" size={48} color={colors.onAccent} />
-                  </EmberOrb>
-                </View>
               )}
             </View>
 
-            <Text style={[styles.recTime, { color: recording ? colors.gold : colors.chevron }]}>
-              {fmtTime(recSeconds)}
-            </Text>
-
-            {recLocked && (
-              <Pressable onPress={finalizeRec} style={styles.stopPill}>
-                <View style={styles.stopPillSquare} />
-                <Text style={styles.stopPillText}>{t('audio_stop')}</Text>
-              </Pressable>
-            )}
+            {/* bottom controls — "Caméra" sits exactly where "Audio" is in camera mode */}
+            <View style={styles.camControls}>
+              {recording ? (
+                <View style={styles.camSideBtn} />
+              ) : (
+                <Pressable onPress={resetCapture} style={styles.camSideBtn}>
+                  <View style={styles.camSideCircle}>
+                    <Svg width={23} height={23} viewBox="0 0 24 24" fill="none" stroke="#ff9ec0" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+                      <Path d="M5 8h2.5l1.2-2h6.6l1.2 2H19a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2z" />
+                      <Circle cx={12} cy={13} r={3} />
+                    </Svg>
+                  </View>
+                  <Text style={styles.camSideLabel}>{t('audio_back_cam')}</Text>
+                </Pressable>
+              )}
+              <View style={styles.shutter} />
+              <View style={styles.camSideBtn} />
+            </View>
           </View>
         )}
 
@@ -676,7 +848,7 @@ export default function DepositScreen({ onDone, onPay }: { onDone: () => void; o
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.condTitle}>{t('cond_location')}</Text>
-                <Text style={styles.condSub}>Parc de la Tête d'Or · {t('loc_mandatory')}</Text>
+                <Text style={styles.condSub}>{CURRENT_PLACE} · {t('loc_mandatory')}</Text>
               </View>
               <Text style={styles.condEnabled}>{t('cond_enabled')}</Text>
             </View>
@@ -779,7 +951,7 @@ export default function DepositScreen({ onDone, onPay }: { onDone: () => void; o
               )}
             </ReviewCard>
             <ReviewCard label={t('lbl_conditions')}>
-              <Text style={styles.reviewValue}>Parc de la Tête d'Or · {condReview(draft, t)}</Text>
+              <Text style={styles.reviewValue}>{CURRENT_PLACE} · {condReview(draft, t)}</Text>
               {draft.useDate && !!draft.date && (
                 <View style={styles.reviewDateRow}>
                   <Svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={colors.gold} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -795,9 +967,9 @@ export default function DepositScreen({ onDone, onPay }: { onDone: () => void; o
       </ScrollView>
 
       {/* footer */}
-      <View style={[styles.footer, { paddingBottom: 16 }]}>
+      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 14) + TAB_BAR_HEIGHT + 8 }]}>
         {step === 4 ? (
-          <Pressable onPress={() => setBuried(true)}>
+          <Pressable onPress={() => { successHaptic(); addMyCapsule(buildCapsule(draft)); setBuried(true); }}>
             <LinearGradient colors={goldPinkGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.buryBtn}>
               <Text style={styles.buryText}>{t('btn_bury')}</Text>
             </LinearGradient>
@@ -1005,9 +1177,10 @@ const EMBERS = [
   { top: '85%', left: '82%', color: '#ff5c8a', size: 3, dur: 3700, delay: 400 },
 ] as const;
 
-function Ember({ top, left, color, size, dur, delay }: (typeof EMBERS)[number]) {
+function Ember({ top, left, color, size, dur, delay, reduce }: (typeof EMBERS)[number] & { reduce?: boolean }) {
   const v = useRef(new Animated.Value(0)).current;
   useEffect(() => {
+    if (reduce) return;
     const loop = Animated.loop(
       Animated.sequence([
         Animated.delay(delay),
@@ -1017,10 +1190,10 @@ function Ember({ top, left, color, size, dur, delay }: (typeof EMBERS)[number]) 
     );
     loop.start();
     return () => loop.stop();
-  }, [v, dur, delay]);
-  const opacity = v.interpolate({ inputRange: [0, 1], outputRange: [0.12, 0.95] });
-  const translateY = v.interpolate({ inputRange: [0, 1], outputRange: [0, -7] });
-  const scale = v.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1.25] });
+  }, [v, dur, delay, reduce]);
+  const opacity = reduce ? 0.4 : v.interpolate({ inputRange: [0, 1], outputRange: [0.12, 0.95] });
+  const translateY = reduce ? 0 : v.interpolate({ inputRange: [0, 1], outputRange: [0, -7] });
+  const scale = reduce ? 1 : v.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1.25] });
   return (
     <Animated.View
       style={{
@@ -1038,9 +1211,10 @@ function Ember({ top, left, color, size, dur, delay }: (typeof EMBERS)[number]) 
   );
 }
 
-function Ambiance() {
+function Ambiance({ reduce }: { reduce?: boolean }) {
   const glow = useRef(new Animated.Value(0)).current;
   useEffect(() => {
+    if (reduce) return;
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(glow, { toValue: 1, duration: 2750, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
@@ -1049,9 +1223,9 @@ function Ambiance() {
     );
     loop.start();
     return () => loop.stop();
-  }, [glow]);
-  const glowOpacity = glow.interpolate({ inputRange: [0, 1], outputRange: [0.55, 0.95] });
-  const glowScale = glow.interpolate({ inputRange: [0, 1], outputRange: [1, 1.1] });
+  }, [glow, reduce]);
+  const glowOpacity = reduce ? 0.7 : glow.interpolate({ inputRange: [0, 1], outputRange: [0.55, 0.95] });
+  const glowScale = reduce ? 1 : glow.interpolate({ inputRange: [0, 1], outputRange: [1, 1.1] });
   return (
     <View pointerEvents="none" style={styles.ambiance}>
       <Animated.View style={[styles.ambGlow, { opacity: glowOpacity, transform: [{ translateX: -160 }, { scale: glowScale }] }]}>
@@ -1066,7 +1240,7 @@ function Ambiance() {
         </Svg>
       </Animated.View>
       {EMBERS.map((e, i) => (
-        <Ember key={i} {...e} />
+        <Ember key={i} {...e} reduce={reduce} />
       ))}
     </View>
   );
@@ -1127,17 +1301,17 @@ const styles = StyleSheet.create({
   redo: { fontSize: 13, color: colors.gold, fontFamily: fonts.bodyBold },
 
   // camera viewfinder
-  viewfinder: {
-    flex: 1,
-    minHeight: 230,
-    borderRadius: 26,
+  viewfinderFull: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     overflow: 'hidden',
     backgroundColor: '#1d1238',
-    borderWidth: 1,
-    borderColor: 'rgba(255,92,138,0.2)',
   },
+  camControlsWrap: { flex: 1, justifyContent: 'flex-end', gap: 16 },
   gridLine: { position: 'absolute', backgroundColor: 'rgba(255,255,255,0.08)' },
-  bracket: { position: 'absolute', width: 24, height: 24, borderColor: 'rgba(255,212,92,0.55)' },
   reticle: {
     position: 'absolute',
     top: '50%',
@@ -1150,35 +1324,11 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.28)',
     borderRadius: 12,
   },
-  camStatusWrap: { position: 'absolute', top: 14, left: 0, right: 0, alignItems: 'center' },
-  camStatusPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-    backgroundColor: 'rgba(20,13,40,0.66)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,92,138,0.2)',
-    borderRadius: 30,
-    paddingHorizontal: 13,
-    paddingVertical: 6,
-  },
-  recDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.accentDeep },
-  camStatusText: { fontSize: 11.5, color: '#e9def7', fontFamily: fonts.bodyBold },
-  camHint: { position: 'absolute', bottom: 14, left: 0, right: 0, textAlign: 'center', fontSize: 11.5, color: 'rgba(233,222,247,0.55)', fontFamily: fonts.body },
+  camHint: { textAlign: 'center', fontSize: 11.5, color: 'rgba(233,222,247,0.55)', fontFamily: fonts.body },
+  recIndicator: { position: 'absolute', left: 0, right: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
+  recIndicatorDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#ff3b30' },
+  recIndicatorText: { color: '#fff', fontSize: 12.5, fontFamily: fonts.bodyBold, letterSpacing: 1.5 },
   flipFlash: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#fff' },
-  camModeToggle: {
-    alignSelf: 'center',
-    flexDirection: 'row',
-    backgroundColor: colors.panel,
-    borderWidth: 1,
-    borderColor: colors.panelBorder,
-    borderRadius: 30,
-    padding: 4,
-  },
-  camPill: { paddingHorizontal: 22, paddingVertical: 8, borderRadius: 24 },
-  camPillActive: { backgroundColor: colors.accentDim },
-  camPillText: { fontSize: 13, fontFamily: fonts.bodyBold, color: colors.textSecondary },
-  camPillTextActive: { color: colors.gold },
   camControls: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, paddingBottom: 4 },
   camSideBtn: { alignItems: 'center', gap: 6, width: 64 },
   camSideCircle: {
@@ -1194,8 +1344,12 @@ const styles = StyleSheet.create({
   camSideLabel: { fontSize: 11, color: colors.textSoft, fontFamily: fonts.bodyBold },
   shutter: { width: 84, height: 84, alignItems: 'center', justifyContent: 'center' },
   shutterRing: { position: 'absolute', width: 84, height: 84, borderRadius: 42, borderWidth: 4, borderColor: 'rgba(255,255,255,0.92)' },
+  shutterRingRec: { borderColor: colors.accentDeep },
   shutterInnerPhoto: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#fff' },
   shutterInnerVideo: { width: 34, height: 34, borderRadius: 11, backgroundColor: colors.accentDeep },
+  stopSquareSmall: { width: 28, height: 28, borderRadius: 7, backgroundColor: colors.gold },
+  lockBadgeCam: { position: 'absolute', top: 0, right: 2, width: 24, height: 24, borderRadius: 12, backgroundColor: '#1d1238', borderWidth: 1, borderColor: 'rgba(255,92,138,0.3)', alignItems: 'center', justifyContent: 'center' },
+  lockHintCam: { position: 'absolute', top: -44, alignItems: 'center', gap: 1 },
 
   // audio record / play
   audioWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 34, paddingBottom: 10 },
@@ -1205,7 +1359,7 @@ const styles = StyleSheet.create({
   recOrbWrapper: { width: 124, height: 124, alignItems: 'center', justifyContent: 'center' },
   lockHint: { position: 'absolute', top: -38, alignItems: 'center', gap: 1 },
   stopSquare: { width: 38, height: 38, borderRadius: 9, backgroundColor: colors.onAccent },
-  lockBadge: { position: 'absolute', top: 8, right: 30, width: 30, height: 30, borderRadius: 15, backgroundColor: '#1d1238', borderWidth: 1, borderColor: 'rgba(255,92,138,0.3)', alignItems: 'center', justifyContent: 'center' },
+  lockBadge: { position: 'absolute', top: -42, left: 47, width: 30, height: 30, borderRadius: 15, backgroundColor: '#1d1238', borderWidth: 1, borderColor: 'rgba(255,92,138,0.3)', alignItems: 'center', justifyContent: 'center' },
   stopPill: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 22, paddingVertical: 11, borderRadius: 30, backgroundColor: colors.accentDimSoft, borderWidth: 1.5, borderColor: 'rgba(255,92,138,0.3)' },
   stopPillSquare: { width: 13, height: 13, borderRadius: 3, backgroundColor: colors.gold },
   stopPillText: { color: colors.gold, fontFamily: fonts.bodyBold, fontSize: 13.5 },

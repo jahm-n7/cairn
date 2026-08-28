@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Text } from '../theme/textScale';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle, Path, Polyline } from 'react-native-svg';
@@ -7,6 +8,7 @@ import Slider from '@react-native-community/slider';
 import { colors, fonts, goldPinkGradient } from '../theme/colors';
 import { useI18n, Lang, TKey } from '../i18n';
 import { useSettings, SettingsState } from '../settings';
+import { selectHaptic } from '../theme/haptics';
 
 type Row =
   | { type: 'toggle'; key: keyof SettingsState; label: string; sub?: string }
@@ -17,10 +19,14 @@ type Row =
 export default function SettingsScreen({ onClose }: { onClose: () => void }) {
   const insets = useSafeAreaInsets();
   const { t, lang, setLang } = useI18n();
-  const { settings: s, setSetting, account, setAccount } = useSettings();
+  const { settings: s, setSetting, account, setAccount, signOut } = useSettings();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({ name: false, email: false, phone: false });
 
   const set = (key: keyof SettingsState, v: any) => setSetting(key, v);
+  const setTapped = (key: keyof SettingsState, v: any) => {
+    selectHaptic();
+    setSetting(key, v);
+  };
   const toggleExp = (k: string) => setExpanded((e) => ({ ...e, [k]: !e[k] }));
 
   const sections: { title: string; rows: Row[] }[] = [
@@ -51,6 +57,7 @@ export default function SettingsScreen({ onClose }: { onClose: () => void }) {
         { type: 'toggle', key: 'notifFriend', label: t('sett_notif_friend') },
         { type: 'toggle', key: 'notifUnearth', label: t('sett_notif_unearth'), sub: t('sett_notif_unearth_sub') },
         { type: 'toggle', key: 'notifReminder', label: t('sett_notif_remind'), sub: t('sett_notif_remind_sub') },
+        { type: 'toggle', key: 'emailUpdates', label: t('sett_email_updates'), sub: t('sett_email_updates_sub') },
         { type: 'toggle', key: 'sound', label: t('sett_sound') },
         { type: 'toggle', key: 'haptics', label: t('sett_haptics') },
       ],
@@ -58,15 +65,10 @@ export default function SettingsScreen({ onClose }: { onClose: () => void }) {
     {
       title: t('sec_map'),
       rows: [
-        { type: 'segment', key: 'defaultView', label: t('sett_default_view'), options: [
-          { label: t('str_map'), v: 'map' },
-          { label: t('str_radar'), v: 'radar' },
-        ] },
         { type: 'segment', key: 'units', label: t('sett_units'), options: [
           { label: t('opt_meters'), v: 'm' },
           { label: t('opt_feet'), v: 'ft' },
         ] },
-        { type: 'toggle', key: 'radarPulse', label: t('sett_radar_pulse'), sub: t('sett_radar_pulse_sub') },
       ],
     },
     {
@@ -166,13 +168,13 @@ export default function SettingsScreen({ onClose }: { onClose: () => void }) {
                         <Text style={styles.rowLabel}>{row.label}</Text>
                         {!!row.sub && <Text style={styles.rowSub}>{row.sub}</Text>}
                       </View>
-                      <Toggle on={!!s[row.key]} onPress={() => set(row.key, !s[row.key])} />
+                      <Toggle on={!!s[row.key]} onPress={() => setTapped(row.key, !s[row.key])} />
                     </View>
                   )}
                   {row.type === 'segment' && (
                     <View>
                       <Text style={styles.rowLabel}>{row.label}</Text>
-                      <Segment options={row.options} value={String(s[row.key])} onSelect={(v) => set(row.key, v)} />
+                      <Segment options={row.options} value={String(s[row.key])} onSelect={(v) => setTapped(row.key, v)} />
                     </View>
                   )}
                   {row.type === 'slider' && (
@@ -221,7 +223,7 @@ export default function SettingsScreen({ onClose }: { onClose: () => void }) {
 
         {/* actions */}
         <View style={{ marginTop: 26, gap: 11 }}>
-          <Pressable onPress={onClose} style={styles.logoutBtn}>
+          <Pressable onPress={() => { onClose(); signOut(); }} style={styles.logoutBtn}>
             <Text style={styles.logoutText}>{t('sett_logout')}</Text>
           </Pressable>
           <Pressable style={styles.deleteBtn}>

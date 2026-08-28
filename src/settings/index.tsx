@@ -15,11 +15,10 @@ export type SettingsState = {
   notifFriend: boolean;
   notifUnearth: boolean;
   notifReminder: boolean;
+  emailUpdates: boolean; // consent to receive email notifications (capsule ready/opened, app news)
   sound: boolean;
   haptics: boolean;
-  defaultView: string; // 'map' | 'radar'
   units: string; // 'm' | 'ft'
-  radarPulse: boolean;
   textSize: number;
   reduceMotion: boolean;
   offline: boolean;
@@ -38,11 +37,10 @@ export const SETTINGS_DEFAULTS: SettingsState = {
   notifFriend: true,
   notifUnearth: true,
   notifReminder: false,
+  emailUpdates: false,
   sound: true,
   haptics: true,
-  defaultView: 'map',
   units: 'm',
-  radarPulse: true,
   textSize: 100,
   reduceMotion: false,
   offline: false,
@@ -63,6 +61,10 @@ type Ctx = {
   account: Account;
   setAccount: (patch: Partial<Account>) => void;
   reset: () => void;
+  hydrated: boolean; // AsyncStorage load finished
+  onboarded: boolean; // first-launch onboarding completed
+  completeOnboarding: () => void;
+  signOut: () => void;
 };
 
 const SettingsContext = createContext<Ctx | null>(null);
@@ -70,6 +72,7 @@ const SettingsContext = createContext<Ctx | null>(null);
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [settings, setSettings] = useState<SettingsState>(SETTINGS_DEFAULTS);
   const [account, setAccountState] = useState<Account>(ACCOUNT_DEFAULTS);
+  const [onboarded, setOnboarded] = useState(false);
   const [ready, setReady] = useState(false);
 
   // Load persisted values once on mount.
@@ -81,6 +84,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           const parsed = JSON.parse(raw);
           if (parsed.settings) setSettings((s) => ({ ...s, ...parsed.settings }));
           if (parsed.account) setAccountState((a) => ({ ...a, ...parsed.account }));
+          if (parsed.onboarded) setOnboarded(true);
         }
       } catch {
         // AsyncStorage unavailable — run with in-memory defaults.
@@ -92,18 +96,25 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   // Persist on every change, once the initial load has happened.
   useEffect(() => {
     if (!ready) return;
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ settings, account })).catch(() => {});
-  }, [settings, account, ready]);
+    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ settings, account, onboarded })).catch(() => {});
+  }, [settings, account, onboarded, ready]);
 
   const setSetting: Ctx['setSetting'] = (key, value) => setSettings((s) => ({ ...s, [key]: value }));
   const setAccount = (patch: Partial<Account>) => setAccountState((a) => ({ ...a, ...patch }));
+  const completeOnboarding = () => setOnboarded(true);
   const reset = () => {
     setSettings(SETTINGS_DEFAULTS);
     setAccountState(ACCOUNT_DEFAULTS);
   };
+  // Sign out: wipe the profile back to a clean slate and send the user through
+  // the first-launch onboarding / sign-up again (persists, so it survives relaunch).
+  const signOut = () => {
+    reset();
+    setOnboarded(false);
+  };
 
   return (
-    <SettingsContext.Provider value={{ settings, setSetting, account, setAccount, reset }}>
+    <SettingsContext.Provider value={{ settings, setSetting, account, setAccount, reset, hydrated: ready, onboarded, completeOnboarding, signOut }}>
       {children}
     </SettingsContext.Provider>
   );
