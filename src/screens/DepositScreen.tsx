@@ -409,17 +409,21 @@ export default function DepositScreen({ onPay, onCapturingChange }: { onPay: (r:
   const overCount = Math.max(0, selectedCount - capacity);
   const payNeeded = overCount > 0;
   const friendsAtMax = selectedCount >= capacity;
-  const friendPayShow = payNeeded; // only when the selection exceeds the cap
+  // Show the pay button both when a circle has pushed the selection OVER the cap
+  // (confirm the overflow) and when the selection has simply REACHED the cap
+  // (pay 1,99 € to unlock one more manual pick).
+  const friendPayShow = payNeeded || friendsAtMax;
+  const payUnits = overCount > 0 ? overCount : 1;
   const limitColor = payNeeded ? '#ff5a6e' : friendsAtMax ? colors.gold : colors.textMuted;
   const fmtEur = (n: number) => n.toFixed(2).replace('.', ',') + ' €';
   const peopleWord = (n: number) => (n > 1 ? 'personnes' : 'personne');
   const friendPayLabel =
-    overCount > 1
-      ? `Payer pour ${overCount} personnes · ${fmtEur(overCount * 1.99)}`
+    payUnits > 1
+      ? `Payer pour ${payUnits} personnes · ${fmtEur(payUnits * 1.99)}`
       : `Ajouter 1 personne · ${fmtEur(1.99)}`;
 
   const openFriendPay = () => {
-    onPay({ mode: 'friend', units: overCount, onProceed: () => setPaidPeople((p) => p + overCount) });
+    onPay({ mode: 'friend', units: payUnits, onProceed: () => setPaidPeople((p) => p + payUnits) });
   };
 
   const toggleFriend = (name: string) =>
@@ -578,7 +582,7 @@ export default function DepositScreen({ onPay, onCapturingChange }: { onPay: (r:
 
         {cAudioRec && (
           <View style={{ flex: 1 }}>
-            <View style={styles.audioWrap}>
+            <View style={[styles.audioWrap, recording && styles.audioWrapRec]}>
               {!recording && (
                 <View style={{ alignItems: 'center' }}>
                   <Text style={styles.audioTitle}>{t('audio_title')}</Text>
@@ -598,12 +602,15 @@ export default function DepositScreen({ onPay, onCapturingChange }: { onPay: (r:
                     </Svg>
                   </View>
                 )}
-                {recording && (
-                  <>
-                    <View style={styles.recPulse} />
-                    <View style={styles.recPulseInner} />
-                  </>
-                )}
+                {recording &&
+                  (reduceMotion ? (
+                    <>
+                      <View style={styles.recPulse} />
+                      <View style={styles.recPulseInner} />
+                    </>
+                  ) : (
+                    <RecWaves />
+                  ))}
                 {recLocked ? (
                   <Pressable onPress={finalizeRec} style={styles.recOrbWrapper}>
                     <EmberOrb size={124}>
@@ -1246,6 +1253,35 @@ function Ambiance({ reduce }: { reduce?: boolean }) {
   );
 }
 
+// Expanding coloured halo waves rippling out from the voice-record button.
+const WAVE_COLORS = ['rgba(255,92,138,0.32)', 'rgba(255,212,92,0.28)', 'rgba(255,158,192,0.26)'];
+function RecWaves() {
+  return (
+    <View style={styles.wavesWrap} pointerEvents="none">
+      {WAVE_COLORS.map((c, i) => (
+        <Wave key={i} color={c} delay={i * 800} />
+      ))}
+    </View>
+  );
+}
+
+function Wave({ color, delay }: { color: string; delay: number }) {
+  const v = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.delay(delay),
+        Animated.timing(v, { toValue: 1, duration: 2400, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [v, delay]);
+  const scale = v.interpolate({ inputRange: [0, 1], outputRange: [0.85, 2.1] });
+  const opacity = v.interpolate({ inputRange: [0, 0.12, 1], outputRange: [0, 0.55, 0] });
+  return <Animated.View style={[styles.wave, { backgroundColor: color, opacity, transform: [{ scale }] }]} />;
+}
+
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   ambiance: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden', zIndex: 0 },
@@ -1353,6 +1389,7 @@ const styles = StyleSheet.create({
 
   // audio record / play
   audioWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 34, paddingBottom: 10 },
+  audioWrapRec: { paddingTop: 90 }, // nudge the recording cluster lower while recording
   audioTitle: { fontFamily: fonts.display, fontSize: 22, color: colors.textPrimary },
   audioInstruction: { fontSize: 13, color: colors.textSoft, marginTop: 5, fontFamily: fonts.body },
   recBtnWrap: { width: 172, height: 172, alignItems: 'center', justifyContent: 'center' },
@@ -1365,6 +1402,8 @@ const styles = StyleSheet.create({
   stopPillText: { color: colors.gold, fontFamily: fonts.bodyBold, fontSize: 13.5 },
   recPulse: { position: 'absolute', width: 172, height: 172, borderRadius: 86, backgroundColor: 'rgba(255,92,138,0.18)' },
   recPulseInner: { position: 'absolute', width: 136, height: 136, borderRadius: 68, backgroundColor: 'rgba(255,212,92,0.14)' },
+  wavesWrap: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
+  wave: { position: 'absolute', top: '50%', left: '50%', width: 132, height: 132, borderRadius: 66, marginTop: -66, marginLeft: -66 },
   recOrb: { width: 124, height: 124, borderRadius: 62, alignItems: 'center', justifyContent: 'center' },
   playRing: { position: 'absolute', width: 172, height: 172, borderRadius: 86, borderWidth: 6, borderColor: 'rgba(255,92,138,0.18)' },
   recTime: { fontFamily: fonts.display, fontSize: 22, letterSpacing: 1 },
