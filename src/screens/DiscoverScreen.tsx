@@ -13,6 +13,9 @@ import { TAB_BAR_HEIGHT } from '../components/TabBar';
 
 type Filter = 'all' | 'public' | 'friends' | 'mine';
 
+// Second filtering step: whether the beacon can be opened right now.
+type OpenState = 'both' | 'openable' | 'locked';
+
 const FILTER_OPTIONS: { key: Filter; labelKey: string; color: string }[] = [
   { key: 'all', labelKey: 'filter_all', color: '#b6a9d0' },
   { key: 'public', labelKey: 'filter_public', color: '#b59ad0' },
@@ -20,11 +23,28 @@ const FILTER_OPTIONS: { key: Filter; labelKey: string; color: string }[] = [
   { key: 'mine', labelKey: 'filter_mine', color: '#ffd45c' },
 ];
 
+const OPEN_OPTIONS: { key: OpenState; labelKey: string; color: string }[] = [
+  { key: 'both', labelKey: 'filter_open_both', color: '#b6a9d0' },
+  { key: 'openable', labelKey: 'filter_open_yes', color: '#4fd6a0' },
+  { key: 'locked', labelKey: 'filter_open_no', color: '#8f83b0' },
+];
+
 function matchesFilter(accessType: AccessType, filter: Filter): boolean {
   if (filter === 'all') return true;
   if (filter === 'mine') return accessType === 'mine';
   if (filter === 'public') return accessType === 'public';
   return accessType !== 'mine' && accessType !== 'public';
+}
+
+// A beacon is openable when you're close enough (here) and it isn't time-locked.
+function isOpenable(capsule: Capsule & { here: boolean }): boolean {
+  const timeLocked = !!capsule.openDate && new Date(capsule.openDate).getTime() > Date.now();
+  return capsule.here && !timeLocked;
+}
+
+function matchesOpenState(capsule: Capsule & { here: boolean }, openState: OpenState): boolean {
+  if (openState === 'both') return true;
+  return openState === 'openable' ? isOpenable(capsule) : !isOpenable(capsule);
 }
 
 type FullCapsule = Capsule & { here: boolean; distance: string };
@@ -40,12 +60,15 @@ export default function DiscoverScreen({
   const [selectedId, setSelectedId] = useState(capsules[0].id);
   const [tracked, setTracked] = useState<string[]>([capsules[0].id]);
   const [filter, setFilter] = useState<Filter>('all');
+  const [openState, setOpenState] = useState<OpenState>('both');
   const [filterOpen, setFilterOpen] = useState(false);
 
   const selected = capsules.find((c) => c.id === selectedId) ?? capsules[0];
-  const mapCapsules = capsules.filter((c) => matchesFilter(c.accessType, filter));
+  const mapCapsules = capsules.filter(
+    (c) => matchesFilter(c.accessType, filter) && matchesOpenState(c, openState)
+  );
   const isSelectedTracked = tracked.includes(selectedId);
-  const filterActive = filter !== 'all';
+  const filterActive = filter !== 'all' || openState !== 'both';
 
   const toggleTrack = (id: string) => {
     selectHaptic();
@@ -78,10 +101,31 @@ export default function DiscoverScreen({
                   return (
                     <Pressable
                       key={o.key}
-                      onPress={() => {
-                        setFilter(o.key);
-                        setFilterOpen(false);
-                      }}
+                      onPress={() => setFilter(o.key)}
+                      style={[styles.filterOption, on && styles.filterOptionActive]}
+                    >
+                      <View style={[styles.filterColorDot, { backgroundColor: o.color }]} />
+                      <Text style={[styles.filterOptionLabel, on && styles.filterOptionLabelActive]}>
+                        {t(o.labelKey as any)}
+                      </Text>
+                      {on && (
+                        <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={colors.gold} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
+                          <Polyline points="5 13 10 18 19 6" />
+                        </Svg>
+                      )}
+                    </Pressable>
+                  );
+                })}
+
+                <View style={styles.filterDivider} />
+
+                <Text style={styles.filterMenuTitle}>{t('filter_open_title')}</Text>
+                {OPEN_OPTIONS.map((o) => {
+                  const on = openState === o.key;
+                  return (
+                    <Pressable
+                      key={o.key}
+                      onPress={() => setOpenState(o.key)}
                       style={[styles.filterOption, on && styles.filterOptionActive]}
                     >
                       <View style={[styles.filterColorDot, { backgroundColor: o.color }]} />
@@ -183,6 +227,12 @@ const styles = StyleSheet.create({
     borderRadius: 11,
   },
   filterOptionActive: { backgroundColor: colors.accentDimSoft },
+  filterDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255,92,138,0.14)',
+    marginVertical: 5,
+    marginHorizontal: 6,
+  },
   filterColorDot: { width: 10, height: 10, borderRadius: 5 },
   filterOptionLabel: { flex: 1, fontSize: 13.5, fontFamily: fonts.bodyBold, color: '#d6cde8' },
   filterOptionLabelActive: { color: colors.gold },
