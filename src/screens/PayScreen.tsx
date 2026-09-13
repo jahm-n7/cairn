@@ -15,6 +15,7 @@ export type PayRequest = {
   place?: string;
   sub?: string;
   units?: number; // for friend mode: number of extra people being paid for
+  nextIndex?: number; // for friend mode: ordinal of the first added friend (6th, 7th, …)
   onProceed?: () => void;
 };
 
@@ -38,11 +39,20 @@ const SUBS: Record<PayMode, string> = {
 
 export default function PayScreen({ request, onClose }: { request: PayRequest; onClose: () => void }) {
   const insets = useSafeAreaInsets();
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [confirmKind, setConfirmKind] = useState<'pay' | 'edit' | null>(null);
 
   const { mode } = request;
   const units = Math.max(1, request.units ?? 1);
+  // Ordinal of the friend being added — 6th when no extra was paid yet, then
+  // 7th, 8th… as paid slots accumulate. Localised for the description line.
+  const startIdx = Math.max(6, request.nextIndex ?? 6);
+  const enOrd = (n: number) => {
+    const m100 = n % 100;
+    const suf = m100 >= 11 && m100 <= 13 ? 'th' : (['th', 'st', 'nd', 'rd'][n % 10] ?? 'th');
+    return `${n}${suf}`;
+  };
+  const ordinal = lang === 'en' ? enOrd(startIdx) : lang === 'es' ? `${startIdx}º` : `${startIdx}ᵉ`;
   const fmtEur = (n: number) => n.toFixed(2).replace('.', ',') + ' €';
   const price =
     mode === 'both' || mode === 'edit' ? '4,99 €' : mode === 'friend' ? fmtEur(units * 1.99) : '2,99 €';
@@ -58,12 +68,12 @@ export default function PayScreen({ request, onClose }: { request: PayRequest; o
     mode === 'friend'
       ? units > 1
         ? `${units} personnes en plus`
-        : '6ᵉ ami'
+        : `${startIdx}ᵉ ami`
       : mode === 'circle'
       ? SUBS.circle
       : request.sub || SUBS[mode];
   const desc =
-    mode === 'here' ? t('pay_here') : mode === 'friend' ? t('pay_friend') : mode === 'circle' ? t('pay_circle') : mode === 'both' ? t('pay_both') : mode === 'edit' ? t('pay_edit') : t('pay_time');
+    mode === 'here' ? t('pay_here') : mode === 'friend' ? t('pay_friend', { n: ordinal }) : mode === 'circle' ? t('pay_circle') : mode === 'both' ? t('pay_both') : mode === 'edit' ? t('pay_edit') : t('pay_time');
   const ctaLabel = mode === 'edit' ? t('pay_cta_edit') : mode === 'circle' || mode === 'friend' ? t('pay_cta_add') : t('pay_cta_open');
   const gradient = request.gradient ?? (['#5a2d70', '#7a3da0'] as [string, string]);
 

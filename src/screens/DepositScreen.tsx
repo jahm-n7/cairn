@@ -423,7 +423,7 @@ export default function DepositScreen({ onPay, onCapturingChange }: { onPay: (r:
       : `Ajouter 1 personne · ${fmtEur(1.99)}`;
 
   const openFriendPay = () => {
-    onPay({ mode: 'friend', units: payUnits, onProceed: () => setPaidPeople((p) => p + payUnits) });
+    onPay({ mode: 'friend', units: payUnits, nextIndex: capacity + 1, onProceed: () => setPaidPeople((p) => p + payUnits) });
   };
 
   const toggleFriend = (name: string) =>
