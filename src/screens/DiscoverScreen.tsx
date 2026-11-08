@@ -81,6 +81,11 @@ export default function DiscoverScreen({
         <CapsuleMap capsules={mapCapsules} selectedId={selectedId} onSelect={setSelectedId} />
       </View>
 
+      {/* Tap the map behind the open filter menu to dismiss it. */}
+      {filterOpen && (
+        <Pressable style={StyleSheet.absoluteFill} onPress={() => setFilterOpen(false)} />
+      )}
+
       <View style={[styles.foreground, { paddingTop: insets.top + 14 }]} pointerEvents="box-none">
         <View style={styles.topRow}>
           <View>

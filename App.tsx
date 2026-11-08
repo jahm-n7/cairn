@@ -56,7 +56,7 @@ function Shell() {
       {!capturing && <TabBar active={tab} onChange={setTab} bottomInset={insets.bottom} />}
       {detail && <CapsuleDetailFlow capsule={detail} onClose={() => setDetail(null)} onPay={setPay} />}
       {settingsOpen && <SettingsScreen onClose={() => setSettingsOpen(false)} />}
-      {friendsTarget && <FriendsFlow target={friendsTarget} onClose={() => setFriendsTarget(null)} />}
+      {friendsTarget && <FriendsFlow target={friendsTarget} onClose={() => setFriendsTarget(null)} onPay={setPay} />}
       {myCap && <MyCapDetailScreen capsule={myCap} onClose={() => setMyCap(null)} onPay={setPay} />}
       {pay && <PayScreen request={pay} onClose={() => setPay(null)} />}
       <StatusBar style="light" />

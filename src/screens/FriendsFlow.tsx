@@ -7,8 +7,12 @@ import Svg, { Circle, Line, Path, Polyline } from 'react-native-svg';
 import { colors, fonts, goldPinkGradient } from '../theme/colors';
 import { useFriends } from '../data/friendsStore';
 import { useI18n } from '../i18n';
+import { PayRequest } from './PayScreen';
 
 const COLOR_OPTIONS = ['#7a3da0', '#2d9d8f', '#c43d7a', '#3a3060', '#6e5a90', '#4a3a60'];
+
+// A new circle holds 4 people for free; each extra person costs €1.99.
+const FREE_MEMBERS = 4;
 
 // What to show. The friends/circles list lives inline on the profile slide; this
 // overlay only handles a single friend's detail or the circle editor.
@@ -17,7 +21,7 @@ export type FriendsTarget =
   | { type: 'circle'; id: string }
   | { type: 'newCircle' };
 
-export default function FriendsFlow({ target, onClose }: { target: FriendsTarget; onClose: () => void }) {
+export default function FriendsFlow({ target, onClose, onPay }: { target: FriendsTarget; onClose: () => void; onPay: (r: PayRequest) => void }) {
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
   const { friends, circles, removeFriend, toggleBlock, saveCircle, deleteCircle } = useFriends();
@@ -29,9 +33,25 @@ export default function FriendsFlow({ target, onClose }: { target: FriendsTarget
     color: editingCircle?.color ?? '#7a3da0',
     members: editingId ? friends.filter((f) => f.circles.includes(editingId)).map((f) => f.id) : [],
   }));
+  // Paid member slots unlocked in this session (new circles only).
+  const [paidMembers, setPaidMembers] = useState(0);
+
+  // The paywall applies when creating a new circle: 4 free + any paid slots.
+  const chargeMembers = !editingId;
+  const memberCap = FREE_MEMBERS + paidMembers;
+  const membersAtMax = draft.members.length >= memberCap;
 
   const toggleMember = (fid: string) =>
-    setDraft((d) => ({ ...d, members: d.members.includes(fid) ? d.members.filter((x) => x !== fid) : d.members.concat([fid]) }));
+    setDraft((d) => {
+      const has = d.members.includes(fid);
+      // adding is locked once a new circle reaches its (paid) capacity
+      if (!has && chargeMembers && d.members.length >= memberCap) return d;
+      return { ...d, members: has ? d.members.filter((x) => x !== fid) : d.members.concat([fid]) };
+    });
+
+  const openMemberPay = () => {
+    onPay({ mode: 'member', units: 1, nextIndex: memberCap + 1, onProceed: () => setPaidMembers((p) => p + 1) });
+  };
 
   // ----- FRIEND DETAIL -----
   if (target.type === 'friend') {
@@ -125,15 +145,18 @@ export default function FriendsFlow({ target, onClose }: { target: FriendsTarget
           })}
         </View>
 
-        <Text style={[styles.fieldLabel, { marginTop: 20 }]}>{t('members_label')} · {draft.members.length}</Text>
+        <Text style={[styles.fieldLabel, { marginTop: 20 }]}>
+          {t('members_label')} · {chargeMembers ? `${draft.members.length}/${memberCap}` : draft.members.length}
+        </Text>
         <View style={styles.chipWrap}>
           {friends.map((f) => {
             const on = draft.members.includes(f.id);
+            const locked = chargeMembers && membersAtMax && !on;
             return (
               <Pressable
                 key={f.id}
                 onPress={() => toggleMember(f.id)}
-                style={[styles.memberChip, { backgroundColor: on ? colors.accentDim : colors.panelSoft, borderColor: on ? colors.accent : colors.panelBorderMid }]}
+                style={[styles.memberChip, { backgroundColor: on ? colors.accentDim : colors.panelSoft, borderColor: on ? colors.accent : colors.panelBorderMid, opacity: locked ? 0.4 : 1 }]}
               >
                 <View style={[styles.chipAvatar, { backgroundColor: f.color }]}>
                   <Text style={styles.chipAvatarText}>{f.initials}</Text>
@@ -148,6 +171,20 @@ export default function FriendsFlow({ target, onClose }: { target: FriendsTarget
             );
           })}
         </View>
+
+        {chargeMembers && membersAtMax && (
+          <Pressable onPress={openMemberPay} style={{ marginTop: 14 }}>
+            <LinearGradient colors={goldPinkGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.memberPayBtn}>
+              <Svg width={17} height={17} viewBox="0 0 24 24" fill="none" stroke={colors.onAccent} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+                <Circle cx={9} cy={8} r={3.2} />
+                <Path d="M3 20c0-3.2 2.7-5 6-5s6 1.8 6 5" />
+                <Line x1={19} y1={7} x2={19} y2={13} />
+                <Line x1={16} y1={10} x2={22} y2={10} />
+              </Svg>
+              <Text style={styles.memberPayText}>Ajouter 1 personne · 1,99 €</Text>
+            </LinearGradient>
+          </Pressable>
+        )}
 
         {editingId && (
           <Pressable onPress={remove} style={[styles.dangerBtn, { marginTop: 26 }]}>
@@ -211,6 +248,8 @@ const styles = StyleSheet.create({
   chipAvatar: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   chipAvatarText: { color: colors.textPrimary, fontSize: 12, fontFamily: fonts.bodyBold },
   chipName: { fontSize: 13.5, color: colors.textPrimary, fontFamily: fonts.bodyMedium },
+  memberPayBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, borderRadius: 14, paddingVertical: 13 },
+  memberPayText: { color: colors.onAccent, fontFamily: fonts.bodyBold, fontSize: 13.5 },
   saveBtn: { borderRadius: 17, paddingVertical: 16, alignItems: 'center' },
   saveText: { color: colors.onAccent, fontFamily: fonts.bodyBold, fontSize: 16 },
 });

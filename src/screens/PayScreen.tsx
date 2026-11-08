@@ -7,15 +7,15 @@ import Svg, { Circle, Line, Path, Polyline, Rect } from 'react-native-svg';
 import { colors, fonts, goldPinkGradient } from '../theme/colors';
 import { useI18n } from '../i18n';
 
-export type PayMode = 'here' | 'time' | 'circle' | 'friend' | 'both' | 'edit';
+export type PayMode = 'here' | 'time' | 'circle' | 'friend' | 'member' | 'both' | 'edit';
 
 export type PayRequest = {
   mode: PayMode;
   gradient?: [string, string];
   place?: string;
   sub?: string;
-  units?: number; // for friend mode: number of extra people being paid for
-  nextIndex?: number; // for friend mode: ordinal of the first added friend (6th, 7th, …)
+  units?: number; // friend/member mode: number of extra people being paid for
+  nextIndex?: number; // friend/member mode: ordinal of the first added person (6th, 5th, …)
   onProceed?: () => void;
 };
 
@@ -24,6 +24,7 @@ const TITLES: Record<PayMode, string> = {
   edit: 'Modifier la capsule',
   both: 'Ouvrir maintenant, où que vous soyez',
   friend: 'Ajouter un ami',
+  member: 'Ajouter une personne',
   circle: 'Ajouter un cercle',
   here: 'Ouvrir à distance',
   time: "Ouvrir avant l'heure",
@@ -32,6 +33,7 @@ const SUBS: Record<PayMode, string> = {
   edit: 'Modification du contenu',
   both: 'Déterrage immédiat',
   friend: '6ᵉ ami',
+  member: '5ᵉ personne',
   circle: '6ᵉ cercle',
   here: 'Ouverture à distance',
   time: 'Ouverture anticipée',
@@ -44,9 +46,11 @@ export default function PayScreen({ request, onClose }: { request: PayRequest; o
 
   const { mode } = request;
   const units = Math.max(1, request.units ?? 1);
-  // Ordinal of the friend being added — 6th when no extra was paid yet, then
-  // 7th, 8th… as paid slots accumulate. Localised for the description line.
-  const startIdx = Math.max(6, request.nextIndex ?? 6);
+  const perPerson = mode === 'friend' || mode === 'member'; // €1.99 per added person
+  // Ordinal of the person being added — 6th friend / 5th circle member when no
+  // extra was paid yet, then 7th/6th… as paid slots accumulate. Localised for
+  // the description line.
+  const startIdx = Math.max(1, request.nextIndex ?? (mode === 'member' ? 5 : 6));
   const enOrd = (n: number) => {
     const m100 = n % 100;
     const suf = m100 >= 11 && m100 <= 13 ? 'th' : (['th', 'st', 'nd', 'rd'][n % 10] ?? 'th');
@@ -55,12 +59,16 @@ export default function PayScreen({ request, onClose }: { request: PayRequest; o
   const ordinal = lang === 'en' ? enOrd(startIdx) : lang === 'es' ? `${startIdx}º` : `${startIdx}ᵉ`;
   const fmtEur = (n: number) => n.toFixed(2).replace('.', ',') + ' €';
   const price =
-    mode === 'both' || mode === 'edit' ? '4,99 €' : mode === 'friend' ? fmtEur(units * 1.99) : '2,99 €';
+    mode === 'both' || mode === 'edit' ? '4,99 €' : perPerson ? fmtEur(units * 1.99) : '2,99 €';
   const place =
     mode === 'friend'
       ? units > 1
         ? `${units} amis supplémentaires`
         : 'Ami supplémentaire'
+      : mode === 'member'
+      ? units > 1
+        ? `${units} personnes en plus`
+        : 'Personne supplémentaire'
       : mode === 'circle'
       ? 'Cercle supplémentaire'
       : request.place || 'Capsule';
@@ -69,12 +77,16 @@ export default function PayScreen({ request, onClose }: { request: PayRequest; o
       ? units > 1
         ? `${units} personnes en plus`
         : `${startIdx}ᵉ ami`
+      : mode === 'member'
+      ? units > 1
+        ? `${units} personnes en plus`
+        : `${startIdx}ᵉ personne`
       : mode === 'circle'
       ? SUBS.circle
       : request.sub || SUBS[mode];
   const desc =
-    mode === 'here' ? t('pay_here') : mode === 'friend' ? t('pay_friend', { n: ordinal }) : mode === 'circle' ? t('pay_circle') : mode === 'both' ? t('pay_both') : mode === 'edit' ? t('pay_edit') : t('pay_time');
-  const ctaLabel = mode === 'edit' ? t('pay_cta_edit') : mode === 'circle' || mode === 'friend' ? t('pay_cta_add') : t('pay_cta_open');
+    mode === 'here' ? t('pay_here') : mode === 'friend' ? t('pay_friend', { n: ordinal }) : mode === 'member' ? t('pay_member', { n: ordinal }) : mode === 'circle' ? t('pay_circle') : mode === 'both' ? t('pay_both') : mode === 'edit' ? t('pay_edit') : t('pay_time');
+  const ctaLabel = mode === 'edit' ? t('pay_cta_edit') : mode === 'circle' || mode === 'friend' || mode === 'member' ? t('pay_cta_add') : t('pay_cta_open');
   const gradient = request.gradient ?? (['#5a2d70', '#7a3da0'] as [string, string]);
 
   const proceed = () => {

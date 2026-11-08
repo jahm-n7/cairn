@@ -300,6 +300,7 @@ export const TRANSLATIONS: Record<Lang, Record<string, string>> = {
     // pay flow
     pay_here: "Vous pouvez l'ouvrir d'où vous êtes, sans vous déplacer.",
     pay_friend: 'Vous pouvez ouvrir une capsule à 5 amis gratuitement. Ajoutez un {n} ami.',
+    pay_member: 'Un cercle peut compter 4 personnes gratuitement. Ajoutez une {n} personne.',
     pay_circle: 'Vous avez atteint la limite de 5 cercles gratuits. Débloquez un cercle supplémentaire.',
     pay_both: 'Cette capsule est encore scellée et hors de portée. Ouvrez-la dès maintenant, sans attendre ni vous déplacer.',
     pay_time: "Cette capsule est scellée jusqu'à sa date. Vous pouvez la déterrer dès maintenant, sans attendre.",
@@ -612,6 +613,7 @@ export const TRANSLATIONS: Record<Lang, Record<string, string>> = {
     until_mins: 'min',
     pay_here: 'You can open it from where you are, without moving.',
     pay_friend: 'You can open a capsule to 5 friends for free. Add a {n} friend.',
+    pay_member: 'A circle can hold 4 people for free. Add a {n} person.',
     pay_circle: 'You have reached the 5 free circles limit. Unlock an extra circle.',
     pay_both: 'This capsule is still sealed and out of range. Open it right now, wherever you are.',
     pay_time: 'This capsule is sealed until its date. You can unearth it right now, without waiting.',
@@ -923,6 +925,7 @@ export const TRANSLATIONS: Record<Lang, Record<string, string>> = {
     until_mins: 'min',
     pay_here: 'Puedes abrirla desde donde estés, sin moverte.',
     pay_friend: 'Puedes abrir una cápsula a 5 amigos gratis. Añade un {n} amigo.',
+    pay_member: 'Un círculo puede tener 4 personas gratis. Añade una {n} persona.',
     pay_circle: 'Has alcanzado el límite de 5 círculos gratis. Desbloquea un círculo extra.',
     pay_both: 'Esta cápsula sigue sellada y fuera de alcance. Ábrela ahora mismo, donde estés.',
     pay_time: 'Esta cápsula está sellada hasta su fecha. Puedes desenterrarla ahora mismo, sin esperar.',
